@@ -16,14 +16,14 @@ export interface ProductListResponse {
   hasMore: boolean;
 }
 
-export interface ProductWithDetails extends Product {
+export interface ProductWithDetails extends Omit<Product, 'variants'> {
   variants: ProductVariantWithDetails[];
   categories: Category[];
   avg_rating?: number;
   review_count?: number;
 }
 
-export interface ProductVariantWithDetails extends ProductVariant {
+export interface ProductVariantWithDetails extends Omit<ProductVariant, 'images' | 'inventory'> {
   inventory?: {
     stock: number;
     reserved_stock: number;
@@ -33,6 +33,7 @@ export interface ProductVariantWithDetails extends ProductVariant {
     id: string;
     image_url: string;
     display_order: number;
+    variant_id: string; // Required to match VariantImage
   }>;
 }
 
@@ -44,6 +45,8 @@ export interface CreateProductRequest {
   featured?: boolean;
   category_ids?: string[];
   variants?: CreateProductVariantRequest[];
+  images?: string[];
+  primaryImageIndex?: number;
 }
 
 export interface CreateProductVariantRequest {

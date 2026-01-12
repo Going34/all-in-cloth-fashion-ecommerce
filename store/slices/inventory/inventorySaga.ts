@@ -3,7 +3,7 @@ import { apiClient } from '../../api/client';
 import { apiInterceptor } from '../../api/interceptor';
 import { inventoryActions } from './inventorySlice';
 
-function* fetchInventorySaga(action: ReturnType<typeof inventoryActions.fetchInventoryDataRequest>) {
+function* fetchInventorySaga(action: ReturnType<typeof inventoryActions.fetchInventoryDataRequest>): Generator<any, void, unknown> {
   try {
     const config = {
       url: '/admin/inventory',
@@ -13,7 +13,7 @@ function* fetchInventorySaga(action: ReturnType<typeof inventoryActions.fetchInv
 
     const interceptedConfig = apiInterceptor.request(config);
     const response = yield call(apiClient.request, interceptedConfig);
-    const transformedData = apiInterceptor.response(response);
+    const transformedData = apiInterceptor.response(response as any);
 
     yield put(inventoryActions.fetchInventoryDataSuccess({
       items: transformedData.items || [],
@@ -25,7 +25,7 @@ function* fetchInventorySaga(action: ReturnType<typeof inventoryActions.fetchInv
   }
 }
 
-function* fetchInventoryStatsSaga() {
+function* fetchInventoryStatsSaga(): Generator<any, void, unknown> {
   try {
     const config = {
       url: '/admin/inventory/stats',
@@ -34,7 +34,7 @@ function* fetchInventoryStatsSaga() {
 
     const interceptedConfig = apiInterceptor.request(config);
     const response = yield call(apiClient.request, interceptedConfig);
-    const transformedData = apiInterceptor.response(response);
+    const transformedData = apiInterceptor.response(response as any);
 
     yield put(inventoryActions.fetchInventoryStatsSuccess(transformedData));
   } catch (error: any) {
@@ -43,7 +43,7 @@ function* fetchInventoryStatsSaga() {
   }
 }
 
-function* updateStockSaga(action: ReturnType<typeof inventoryActions.updateStockRequest>) {
+function* updateStockSaga(action: ReturnType<typeof inventoryActions.updateStockRequest>): Generator<any, void, unknown> {
   try {
     const config = {
       url: `/admin/inventory/${action.payload.variantId}/stock`,
@@ -56,7 +56,7 @@ function* updateStockSaga(action: ReturnType<typeof inventoryActions.updateStock
 
     const interceptedConfig = apiInterceptor.request(config);
     const response = yield call(apiClient.request, interceptedConfig);
-    const transformedData = apiInterceptor.response(response);
+    const transformedData = apiInterceptor.response(response as any);
 
     yield put(inventoryActions.updateStockSuccess(transformedData));
   } catch (error: any) {
@@ -65,7 +65,7 @@ function* updateStockSaga(action: ReturnType<typeof inventoryActions.updateStock
   }
 }
 
-export function* inventorySaga() {
+export function* inventorySaga(): Generator<any, void, unknown> {
   yield takeLatest(inventoryActions.fetchInventoryDataRequest.type, fetchInventorySaga);
   yield takeEvery(inventoryActions.fetchInventoryStatsRequest.type, fetchInventoryStatsSaga);
   yield takeEvery(inventoryActions.updateStockRequest.type, updateStockSaga);

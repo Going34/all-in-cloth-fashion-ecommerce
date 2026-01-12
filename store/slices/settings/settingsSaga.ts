@@ -3,7 +3,7 @@ import { apiClient } from '../../api/client';
 import { apiInterceptor } from '../../api/interceptor';
 import { settingsActions } from './settingsSlice';
 
-function* fetchSettingsSaga() {
+function* fetchSettingsSaga(): Generator<any, void, unknown> {
   try {
     const config = {
       url: '/admin/settings',
@@ -12,7 +12,7 @@ function* fetchSettingsSaga() {
 
     const interceptedConfig = apiInterceptor.request(config);
     const response = yield call(apiClient.request, interceptedConfig);
-    const transformedData = apiInterceptor.response(response);
+    const transformedData = apiInterceptor.response(response as any);
 
     yield put(settingsActions.fetchSettingsSuccess(transformedData));
   } catch (error: any) {
@@ -21,7 +21,7 @@ function* fetchSettingsSaga() {
   }
 }
 
-function* updateSettingsSaga(action: ReturnType<typeof settingsActions.updateSettingsRequest>) {
+function* updateSettingsSaga(action: ReturnType<typeof settingsActions.updateSettingsRequest>): Generator<any, void, unknown> {
   try {
     const config = {
       url: '/admin/settings',
@@ -31,7 +31,7 @@ function* updateSettingsSaga(action: ReturnType<typeof settingsActions.updateSet
 
     const interceptedConfig = apiInterceptor.request(config);
     const response = yield call(apiClient.request, interceptedConfig);
-    const transformedData = apiInterceptor.response(response);
+    const transformedData = apiInterceptor.response(response as any);
 
     yield put(settingsActions.updateSettingsSuccess(transformedData));
   } catch (error: any) {
@@ -40,7 +40,7 @@ function* updateSettingsSaga(action: ReturnType<typeof settingsActions.updateSet
   }
 }
 
-export function* settingsSaga() {
+export function* settingsSaga(): Generator<any, void, unknown> {
   yield takeEvery(settingsActions.fetchSettingsRequest.type, fetchSettingsSaga);
   yield takeEvery(settingsActions.updateSettingsRequest.type, updateSettingsSaga);
 }

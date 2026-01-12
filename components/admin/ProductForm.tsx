@@ -551,7 +551,7 @@ const ProductForm: React.FC<ProductFormProps> = ({ productId }) => {
         size: v.size,
         sku: v.sku,
         price_override: v.price_override,
-        stock: v.inventory.stock,
+        stock: v.inventory?.stock ?? 0,
         low_stock_threshold: lowStockThreshold,
         is_active: v.is_active,
         images: v.images || [], // Include images if available

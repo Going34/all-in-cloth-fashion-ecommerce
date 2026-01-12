@@ -51,7 +51,14 @@ const AdminSettings: React.FC = () => {
 
   useEffect(() => {
     if (settings) {
-      setLocalSettings(settings);
+      setLocalSettings({
+        ...settings,
+        shipping: {
+          standardRate: settings.shipping.standardRate,
+          expressRate: settings.shipping.expressRate ?? 0,
+          freeShippingThreshold: settings.shipping.freeShippingThreshold ?? 0,
+        },
+      });
       setTempShippingRate(settings.shipping.standardRate.toString());
       setTempTaxRate(settings.tax.rate.toString());
     }

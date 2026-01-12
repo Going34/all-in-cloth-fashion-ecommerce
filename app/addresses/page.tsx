@@ -97,6 +97,7 @@ function AddressesContent() {
               state: '',
               zip: '',
               country: '',
+              phone: '',
               is_default: false,
             });
             setIsAdding(true);
@@ -198,6 +199,7 @@ function AddressesContent() {
                     state: '',
                     zip: '',
                     country: '',
+                    phone: '',
                     is_default: false,
                   });
                 }} 

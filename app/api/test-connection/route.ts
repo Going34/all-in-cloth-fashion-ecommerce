@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
-import { testDatabaseConnectionServer, checkSupabaseConfig } from '@/utils/dbConnection';
+import { testDatabaseConnectionServer } from '@/utils/dbConnection.server';
+import { checkSupabaseConfig } from '@/utils/dbConnection';
 
 /**
  * API Route to test database connection

@@ -7,9 +7,10 @@ import type { Address } from '@/types';
 
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params;
     const user = await requireAuth();
     const supabase = await getDbClient();
 
@@ -17,12 +18,12 @@ export async function PUT(
     const { data: existing } = await supabase
       .from('addresses')
       .select('id')
-      .eq('id', params.id)
+      .eq('id', id)
       .eq('user_id', user.id)
       .single();
 
     if (!existing) {
-      throw new NotFoundError('Address', params.id);
+      throw new NotFoundError('Address', id);
     }
 
     // Remove default from all addresses
@@ -35,7 +36,7 @@ export async function PUT(
     const { data, error } = await supabase
       .from('addresses')
       .update({ is_default: true } as any)
-      .eq('id', params.id)
+      .eq('id', id)
       .eq('user_id', user.id)
       .select()
       .single();

@@ -3,7 +3,7 @@ import { apiClient } from '../../api/client';
 import { apiInterceptor } from '../../api/interceptor';
 import { dashboardActions } from './dashboardSlice';
 
-function* fetchDashboardStatsSaga(action: ReturnType<typeof dashboardActions.fetchDashboardStatsRequest>) {
+function* fetchDashboardStatsSaga(action: ReturnType<typeof dashboardActions.fetchDashboardStatsRequest>): Generator<any, void, unknown> {
   try {
     const config = {
       url: '/admin/dashboard/stats',
@@ -13,7 +13,7 @@ function* fetchDashboardStatsSaga(action: ReturnType<typeof dashboardActions.fet
 
     const interceptedConfig = apiInterceptor.request(config);
     const response = yield call(apiClient.request, interceptedConfig);
-    const transformedData = apiInterceptor.response(response);
+    const transformedData = apiInterceptor.response(response as any);
 
     yield put(dashboardActions.fetchDashboardStatsSuccess(transformedData));
   } catch (error: any) {
@@ -22,7 +22,7 @@ function* fetchDashboardStatsSaga(action: ReturnType<typeof dashboardActions.fet
   }
 }
 
-function* fetchSalesChartSaga(action: ReturnType<typeof dashboardActions.fetchSalesChartRequest>) {
+function* fetchSalesChartSaga(action: ReturnType<typeof dashboardActions.fetchSalesChartRequest>): Generator<any, void, unknown> {
   try {
     const config = {
       url: '/admin/dashboard/sales-chart',
@@ -35,7 +35,7 @@ function* fetchSalesChartSaga(action: ReturnType<typeof dashboardActions.fetchSa
 
     const interceptedConfig = apiInterceptor.request(config);
     const response = yield call(apiClient.request, interceptedConfig);
-    const transformedData = apiInterceptor.response(response);
+    const transformedData = apiInterceptor.response(response as any);
 
     yield put(dashboardActions.fetchSalesChartSuccess(transformedData));
   } catch (error: any) {
@@ -44,7 +44,7 @@ function* fetchSalesChartSaga(action: ReturnType<typeof dashboardActions.fetchSa
   }
 }
 
-function* fetchInventoryAlertsSaga(action: ReturnType<typeof dashboardActions.fetchInventoryAlertsRequest>) {
+function* fetchInventoryAlertsSaga(action: ReturnType<typeof dashboardActions.fetchInventoryAlertsRequest>): Generator<any, void, unknown> {
   try {
     const config = {
       url: '/admin/dashboard/inventory-alerts',
@@ -54,7 +54,7 @@ function* fetchInventoryAlertsSaga(action: ReturnType<typeof dashboardActions.fe
 
     const interceptedConfig = apiInterceptor.request(config);
     const response = yield call(apiClient.request, interceptedConfig);
-    const transformedData = apiInterceptor.response(response);
+    const transformedData = apiInterceptor.response(response as any);
 
     yield put(dashboardActions.fetchInventoryAlertsSuccess(transformedData));
   } catch (error: any) {
@@ -63,7 +63,7 @@ function* fetchInventoryAlertsSaga(action: ReturnType<typeof dashboardActions.fe
   }
 }
 
-export function* dashboardSaga() {
+export function* dashboardSaga(): Generator<any, void, unknown> {
   yield takeLatest(dashboardActions.fetchDashboardStatsRequest.type, fetchDashboardStatsSaga);
   yield takeLatest(dashboardActions.fetchSalesChartRequest.type, fetchSalesChartSaga);
   yield takeLatest(dashboardActions.fetchInventoryAlertsRequest.type, fetchInventoryAlertsSaga);

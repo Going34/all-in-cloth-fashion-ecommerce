@@ -115,6 +115,15 @@ async function createAdminUser() {
         if (authError && authError.message.includes('already exists')) {
           console.log('   ℹ️  User might already exist, checking...');
           // Will be handled in the existing user check above
+          // Try to get user ID from existing users
+          const { data: retryUsers } = await supabase.auth.admin.listUsers();
+          const retryUser = retryUsers?.users?.find(u => u.email === adminEmail);
+          if (retryUser) {
+            userId = retryUser.id;
+          } else {
+            console.error('❌ Failed to create auth user and could not find existing user');
+            process.exit(1);
+          }
         } else {
           console.error('❌ Failed to create auth user');
           process.exit(1);
@@ -123,6 +132,12 @@ async function createAdminUser() {
         userId = authUser.user.id;
         console.log('   ✅ User created in Supabase Auth');
       }
+    }
+
+    // Ensure userId is set before proceeding
+    if (!userId) {
+      console.error('❌ User ID is not available. Cannot proceed.');
+      process.exit(1);
     }
 
     // If we have userId but trigger might have failed, ensure profile exists

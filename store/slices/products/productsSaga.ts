@@ -37,7 +37,7 @@ function transformApiProductToProduct(apiProduct: any): Product {
   } as Product;
 }
 
-function* fetchProductsSaga(action: ReturnType<typeof productsActions.fetchProductsDataRequest>) {
+function* fetchProductsSaga(action: ReturnType<typeof productsActions.fetchProductsDataRequest>): Generator<any, void, unknown> {
   try {
     const config = {
       url: '/admin/products',
@@ -47,7 +47,7 @@ function* fetchProductsSaga(action: ReturnType<typeof productsActions.fetchProdu
 
     const interceptedConfig = apiInterceptor.request(config);
     const response = yield call(apiClient.request, interceptedConfig);
-    const transformedData = apiInterceptor.response(response);
+    const transformedData = apiInterceptor.response(response as any);
 
     // Transform products from API format (camelCase) to Product type (snake_case)
     const products = (transformedData.products || []).map(transformApiProductToProduct);
@@ -62,7 +62,7 @@ function* fetchProductsSaga(action: ReturnType<typeof productsActions.fetchProdu
   }
 }
 
-function* fetchProductByIdSaga(action: ReturnType<typeof productsActions.fetchProductByIdRequest>) {
+function* fetchProductByIdSaga(action: ReturnType<typeof productsActions.fetchProductByIdRequest>): Generator<any, void, unknown> {
   try {
     const config = {
       url: `/admin/products/${action.payload}`,
@@ -71,7 +71,7 @@ function* fetchProductByIdSaga(action: ReturnType<typeof productsActions.fetchPr
 
     const interceptedConfig = apiInterceptor.request(config);
     const response = yield call(apiClient.request, interceptedConfig);
-    const transformedData = apiInterceptor.response(response);
+    const transformedData = apiInterceptor.response(response as any);
 
     // Transform product from API format (camelCase) to Product type (snake_case)
     const product = transformApiProductToProduct(transformedData);
@@ -83,7 +83,7 @@ function* fetchProductByIdSaga(action: ReturnType<typeof productsActions.fetchPr
   }
 }
 
-function* createProductSaga(action: ReturnType<typeof productsActions.createProductRequest>) {
+function* createProductSaga(action: ReturnType<typeof productsActions.createProductRequest>): Generator<any, void, unknown> {
   try {
     const config = {
       url: '/admin/products',
@@ -93,7 +93,7 @@ function* createProductSaga(action: ReturnType<typeof productsActions.createProd
 
     const interceptedConfig = apiInterceptor.request(config);
     const response = yield call(apiClient.request, interceptedConfig);
-    const transformedData = apiInterceptor.response(response);
+    const transformedData = apiInterceptor.response(response as any);
 
     // Transform product from API format (camelCase) to Product type (snake_case)
     const product = transformApiProductToProduct(transformedData);
@@ -105,7 +105,7 @@ function* createProductSaga(action: ReturnType<typeof productsActions.createProd
   }
 }
 
-function* updateProductSaga(action: ReturnType<typeof productsActions.updateProductRequest>) {
+function* updateProductSaga(action: ReturnType<typeof productsActions.updateProductRequest>): Generator<any, void, unknown> {
   try {
     const config = {
       url: `/admin/products/${action.payload.id}`,
@@ -115,7 +115,7 @@ function* updateProductSaga(action: ReturnType<typeof productsActions.updateProd
 
     const interceptedConfig = apiInterceptor.request(config);
     const response = yield call(apiClient.request, interceptedConfig);
-    const transformedData = apiInterceptor.response(response);
+    const transformedData = apiInterceptor.response(response as any);
 
     // Transform product from API format (camelCase) to Product type (snake_case)
     const product = transformApiProductToProduct(transformedData);
@@ -127,7 +127,7 @@ function* updateProductSaga(action: ReturnType<typeof productsActions.updateProd
   }
 }
 
-function* deleteProductSaga(action: ReturnType<typeof productsActions.deleteProductRequest>) {
+function* deleteProductSaga(action: ReturnType<typeof productsActions.deleteProductRequest>): Generator<any, void, unknown> {
   try {
     const config = {
       url: `/admin/products/${action.payload}`,
@@ -146,7 +146,7 @@ function* deleteProductSaga(action: ReturnType<typeof productsActions.deleteProd
   }
 }
 
-function* fetchUserProductsSaga(action: ReturnType<typeof productsActions.fetchUserProductsRequest>) {
+function* fetchUserProductsSaga(action: ReturnType<typeof productsActions.fetchUserProductsRequest>): Generator<any, void, unknown> {
   try {
     const filters = action.payload || {};
     const params: Record<string, any> = {};
@@ -165,7 +165,7 @@ function* fetchUserProductsSaga(action: ReturnType<typeof productsActions.fetchU
 
     const interceptedConfig = apiInterceptor.request(config);
     const response = yield call(apiClient.request, interceptedConfig);
-    const transformedData = apiInterceptor.response(response);
+    const transformedData = apiInterceptor.response(response as any);
 
     // Transform products from API format (camelCase) to Product type (snake_case)
     const productsArray = Array.isArray(transformedData) ? transformedData : [];
@@ -180,7 +180,7 @@ function* fetchUserProductsSaga(action: ReturnType<typeof productsActions.fetchU
   }
 }
 
-function* fetchUserProductByIdSaga(action: ReturnType<typeof productsActions.fetchUserProductByIdRequest>) {
+function* fetchUserProductByIdSaga(action: ReturnType<typeof productsActions.fetchUserProductByIdRequest>): Generator<any, void, unknown> {
   try {
     const config = {
       url: `/products/${action.payload}`,
@@ -189,7 +189,7 @@ function* fetchUserProductByIdSaga(action: ReturnType<typeof productsActions.fet
 
     const interceptedConfig = apiInterceptor.request(config);
     const response = yield call(apiClient.request, interceptedConfig);
-    const transformedData = apiInterceptor.response(response);
+    const transformedData = apiInterceptor.response(response as any);
 
     // Transform product from API format (camelCase) to Product type (snake_case)
     // This ensures variants and inventory are properly mapped
@@ -202,7 +202,7 @@ function* fetchUserProductByIdSaga(action: ReturnType<typeof productsActions.fet
   }
 }
 
-export function* productsSaga() {
+export function* productsSaga(): Generator<any, void, unknown> {
   yield takeLatest(productsActions.fetchProductsDataRequest.type, fetchProductsSaga);
   yield takeEvery(productsActions.fetchProductByIdRequest.type, fetchProductByIdSaga);
   yield takeEvery(productsActions.createProductRequest.type, createProductSaga);

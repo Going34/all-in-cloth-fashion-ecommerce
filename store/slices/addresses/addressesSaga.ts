@@ -4,7 +4,7 @@ import { apiInterceptor } from '../../api/interceptor';
 import { addressesActions } from './addressesSlice';
 import type { Address, AddressInput } from '@/types';
 
-function* fetchAddressesSaga() {
+function* fetchAddressesSaga(): Generator<any, void, unknown> {
   try {
     const config = {
       url: '/addresses',
@@ -13,7 +13,7 @@ function* fetchAddressesSaga() {
 
     const interceptedConfig = apiInterceptor.request(config);
     const response = yield call(apiClient.request, interceptedConfig);
-    const transformedData = apiInterceptor.response(response);
+    const transformedData = apiInterceptor.response(response as any);
 
     const addresses = Array.isArray(transformedData) ? transformedData : [];
 
@@ -24,7 +24,7 @@ function* fetchAddressesSaga() {
   }
 }
 
-function* fetchDefaultAddressSaga() {
+function* fetchDefaultAddressSaga(): Generator<any, void, unknown> {
   try {
     const config = {
       url: '/addresses',
@@ -33,7 +33,7 @@ function* fetchDefaultAddressSaga() {
 
     const interceptedConfig = apiInterceptor.request(config);
     const response = yield call(apiClient.request, interceptedConfig);
-    const transformedData = apiInterceptor.response(response);
+    const transformedData = apiInterceptor.response(response as any);
 
     const addresses = Array.isArray(transformedData) ? transformedData : [];
     const defaultAddress = addresses.find((addr: Address) => addr.is_default) || null;
@@ -45,7 +45,7 @@ function* fetchDefaultAddressSaga() {
   }
 }
 
-function* createAddressSaga(action: ReturnType<typeof addressesActions.createAddressRequest>) {
+function* createAddressSaga(action: ReturnType<typeof addressesActions.createAddressRequest>): Generator<any, void, unknown> {
   try {
     const config = {
       url: '/addresses',
@@ -55,7 +55,7 @@ function* createAddressSaga(action: ReturnType<typeof addressesActions.createAdd
 
     const interceptedConfig = apiInterceptor.request(config);
     const response = yield call(apiClient.request, interceptedConfig);
-    const transformedData = apiInterceptor.response(response);
+    const transformedData = apiInterceptor.response(response as any);
 
     yield put(addressesActions.createAddressSuccess(transformedData));
   } catch (error: any) {
@@ -64,7 +64,7 @@ function* createAddressSaga(action: ReturnType<typeof addressesActions.createAdd
   }
 }
 
-function* updateAddressSaga(action: ReturnType<typeof addressesActions.updateAddressRequest>) {
+function* updateAddressSaga(action: ReturnType<typeof addressesActions.updateAddressRequest>): Generator<any, void, unknown> {
   try {
     const config = {
       url: `/addresses/${action.payload.id}`,
@@ -74,7 +74,7 @@ function* updateAddressSaga(action: ReturnType<typeof addressesActions.updateAdd
 
     const interceptedConfig = apiInterceptor.request(config);
     const response = yield call(apiClient.request, interceptedConfig);
-    const transformedData = apiInterceptor.response(response);
+    const transformedData = apiInterceptor.response(response as any);
 
     yield put(addressesActions.updateAddressSuccess(transformedData));
   } catch (error: any) {
@@ -83,7 +83,7 @@ function* updateAddressSaga(action: ReturnType<typeof addressesActions.updateAdd
   }
 }
 
-function* deleteAddressSaga(action: ReturnType<typeof addressesActions.deleteAddressRequest>) {
+function* deleteAddressSaga(action: ReturnType<typeof addressesActions.deleteAddressRequest>): Generator<any, void, unknown> {
   try {
     const config = {
       url: `/addresses/${action.payload}`,
@@ -92,7 +92,7 @@ function* deleteAddressSaga(action: ReturnType<typeof addressesActions.deleteAdd
 
     const interceptedConfig = apiInterceptor.request(config);
     const response = yield call(apiClient.request, interceptedConfig);
-    const transformedData = apiInterceptor.response(response);
+    const transformedData = apiInterceptor.response(response as any);
 
     yield put(addressesActions.deleteAddressSuccess(action.payload));
   } catch (error: any) {
@@ -101,7 +101,7 @@ function* deleteAddressSaga(action: ReturnType<typeof addressesActions.deleteAdd
   }
 }
 
-function* setDefaultAddressSaga(action: ReturnType<typeof addressesActions.setDefaultAddressRequest>) {
+function* setDefaultAddressSaga(action: ReturnType<typeof addressesActions.setDefaultAddressRequest>): Generator<any, void, unknown> {
   try {
     const config = {
       url: `/addresses/${action.payload}/default`,
@@ -110,7 +110,7 @@ function* setDefaultAddressSaga(action: ReturnType<typeof addressesActions.setDe
 
     const interceptedConfig = apiInterceptor.request(config);
     const response = yield call(apiClient.request, interceptedConfig);
-    const transformedData = apiInterceptor.response(response);
+    const transformedData = apiInterceptor.response(response as any);
 
     yield put(addressesActions.setDefaultAddressSuccess(transformedData));
   } catch (error: any) {

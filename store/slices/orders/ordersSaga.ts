@@ -3,7 +3,7 @@ import { apiClient } from '../../api/client';
 import { apiInterceptor } from '../../api/interceptor';
 import { ordersActions } from './ordersSlice';
 
-function* fetchOrdersSaga(action: ReturnType<typeof ordersActions.fetchOrdersDataRequest>) {
+function* fetchOrdersSaga(action: ReturnType<typeof ordersActions.fetchOrdersDataRequest>): Generator<any, void, unknown> {
   try {
     const config = {
       url: '/admin/orders',
@@ -13,7 +13,7 @@ function* fetchOrdersSaga(action: ReturnType<typeof ordersActions.fetchOrdersDat
 
     const interceptedConfig = apiInterceptor.request(config);
     const response = yield call(apiClient.request, interceptedConfig);
-    const transformedData = apiInterceptor.response(response);
+    const transformedData = apiInterceptor.response(response as any);
 
     yield put(ordersActions.fetchOrdersDataSuccess({
       orders: transformedData.orders || [],
@@ -25,7 +25,7 @@ function* fetchOrdersSaga(action: ReturnType<typeof ordersActions.fetchOrdersDat
   }
 }
 
-function* fetchOrderByIdSaga(action: ReturnType<typeof ordersActions.fetchOrderByIdRequest>) {
+function* fetchOrderByIdSaga(action: ReturnType<typeof ordersActions.fetchOrderByIdRequest>): Generator<any, void, unknown> {
   try {
     const config = {
       url: `/admin/orders/${action.payload}`,
@@ -34,7 +34,7 @@ function* fetchOrderByIdSaga(action: ReturnType<typeof ordersActions.fetchOrderB
 
     const interceptedConfig = apiInterceptor.request(config);
     const response = yield call(apiClient.request, interceptedConfig);
-    const transformedData = apiInterceptor.response(response);
+    const transformedData = apiInterceptor.response(response as any);
 
     yield put(ordersActions.fetchOrderByIdSuccess(transformedData));
   } catch (error: any) {
@@ -43,7 +43,7 @@ function* fetchOrderByIdSaga(action: ReturnType<typeof ordersActions.fetchOrderB
   }
 }
 
-function* updateOrderStatusSaga(action: ReturnType<typeof ordersActions.updateOrderStatusRequest>) {
+function* updateOrderStatusSaga(action: ReturnType<typeof ordersActions.updateOrderStatusRequest>): Generator<any, void, unknown> {
   try {
     const config = {
       url: `/admin/orders/${action.payload.id}/status`,
@@ -56,7 +56,7 @@ function* updateOrderStatusSaga(action: ReturnType<typeof ordersActions.updateOr
 
     const interceptedConfig = apiInterceptor.request(config);
     const response = yield call(apiClient.request, interceptedConfig);
-    const transformedData = apiInterceptor.response(response);
+    const transformedData = apiInterceptor.response(response as any);
 
     yield put(ordersActions.updateOrderStatusSuccess(transformedData));
   } catch (error: any) {
@@ -65,7 +65,7 @@ function* updateOrderStatusSaga(action: ReturnType<typeof ordersActions.updateOr
   }
 }
 
-function* fetchUserOrdersSaga(action: ReturnType<typeof ordersActions.fetchUserOrdersRequest>) {
+function* fetchUserOrdersSaga(action: ReturnType<typeof ordersActions.fetchUserOrdersRequest>): Generator<any, void, unknown> {
   try {
     const filters = action.payload || {};
     const params: Record<string, any> = {};
@@ -81,7 +81,7 @@ function* fetchUserOrdersSaga(action: ReturnType<typeof ordersActions.fetchUserO
 
     const interceptedConfig = apiInterceptor.request(config);
     const response = yield call(apiClient.request, interceptedConfig);
-    const transformedData = apiInterceptor.response(response);
+    const transformedData = apiInterceptor.response(response as any);
 
     const orders = Array.isArray(transformedData) ? transformedData : [];
 
@@ -94,7 +94,7 @@ function* fetchUserOrdersSaga(action: ReturnType<typeof ordersActions.fetchUserO
   }
 }
 
-function* fetchUserOrderByIdSaga(action: ReturnType<typeof ordersActions.fetchUserOrderByIdRequest>) {
+function* fetchUserOrderByIdSaga(action: ReturnType<typeof ordersActions.fetchUserOrderByIdRequest>): Generator<any, void, unknown> {
   try {
     const config = {
       url: `/orders/${action.payload}`,
@@ -103,7 +103,7 @@ function* fetchUserOrderByIdSaga(action: ReturnType<typeof ordersActions.fetchUs
 
     const interceptedConfig = apiInterceptor.request(config);
     const response = yield call(apiClient.request, interceptedConfig);
-    const transformedData = apiInterceptor.response(response);
+    const transformedData = apiInterceptor.response(response as any);
 
     yield put(ordersActions.fetchUserOrderByIdSuccess(transformedData));
   } catch (error: any) {
@@ -112,7 +112,7 @@ function* fetchUserOrderByIdSaga(action: ReturnType<typeof ordersActions.fetchUs
   }
 }
 
-function* createUserOrderSaga(action: ReturnType<typeof ordersActions.createUserOrderRequest>) {
+function* createUserOrderSaga(action: ReturnType<typeof ordersActions.createUserOrderRequest>): Generator<any, void, unknown> {
   try {
     const config = {
       url: '/orders',
@@ -122,7 +122,7 @@ function* createUserOrderSaga(action: ReturnType<typeof ordersActions.createUser
 
     const interceptedConfig = apiInterceptor.request(config);
     const response = yield call(apiClient.request, interceptedConfig);
-    const transformedData = apiInterceptor.response(response);
+    const transformedData = apiInterceptor.response(response as any);
 
     yield put(ordersActions.createUserOrderSuccess(transformedData));
   } catch (error: any) {
@@ -131,7 +131,7 @@ function* createUserOrderSaga(action: ReturnType<typeof ordersActions.createUser
   }
 }
 
-export function* ordersSaga() {
+export function* ordersSaga(): Generator<any, void, unknown> {
   yield takeLatest(ordersActions.fetchOrdersDataRequest.type, fetchOrdersSaga);
   yield takeEvery(ordersActions.fetchOrderByIdRequest.type, fetchOrderByIdSaga);
   yield takeEvery(ordersActions.updateOrderStatusRequest.type, updateOrderStatusSaga);

@@ -11,8 +11,15 @@ import {
   selectSelectedOrder
 } from '@/store/slices/orders/ordersSelectors';
 import { Search, Filter, Download, FileText, X, Package, Truck, CheckCircle2, User, MapPin, CreditCard, Loader2 } from 'lucide-react';
-import { OrderStatus } from '../../types';
+import { OrderStatus, Order } from '../../types';
 import { formatCurrency } from '../../utils/currency';
+
+// Extended Order type for admin view with customer info
+interface AdminOrder extends Order {
+  customer_name?: string;
+  customer_email?: string;
+  shipping_method?: string;
+}
 
 const Orders: React.FC = () => {
   const dispatch = useAppDispatch();
@@ -45,7 +52,7 @@ const Orders: React.FC = () => {
   const tabs = ['All', 'Pending', 'Paid', 'Shipped', 'Delivered', 'Cancelled'];
 
   const filteredOrders = useMemo(() => {
-    let filtered = orders;
+    let filtered = orders as AdminOrder[];
 
     if (activeTab !== 'All') {
       filtered = filtered.filter(order => order.status === activeTab);
@@ -70,7 +77,7 @@ const Orders: React.FC = () => {
     const headers = ['Order ID', 'Date', 'Customer', 'Email', 'Total', 'Status', 'Shipping'];
     const rows = filteredOrders.map(order => [
       order.id,
-      new Date(order.created_at).toLocaleDateString(),
+      order.created_at ? new Date(order.created_at).toLocaleDateString() : 'N/A',
       order.customer_name || 'N/A',
       order.customer_email || 'N/A',
       formatCurrency(order.total),
@@ -187,7 +194,7 @@ const Orders: React.FC = () => {
                       <tr key={order.id} className="hover:bg-slate-50/50 transition-colors group">
                         <td className="px-6 py-4 text-sm font-bold text-indigo-600">{order.id}</td>
                         <td className="px-6 py-4 text-sm text-slate-500">
-                          {new Date(order.created_at).toLocaleDateString()}
+                          {order.created_at ? new Date(order.created_at).toLocaleDateString() : 'N/A'}
                         </td>
                         <td className="px-6 py-4">
                           <span className="text-sm font-medium text-slate-900">{order.customer_name || 'N/A'}</span>

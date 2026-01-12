@@ -236,7 +236,7 @@ export async function createProduct(
     
     // Create image records with correct display_order
     // Primary image gets display_order = 0, others get 1, 2, 3, etc.
-    const imagesToInsert = productData.images.map((url, index) => ({
+    const imagesToInsert = productData.images.map((url: string, index: number) => ({
       product_id: productId,
       image_url: url,
       display_order: index === primaryIndex ? 0 : (index < primaryIndex ? index + 1 : index),
@@ -246,8 +246,8 @@ export async function createProduct(
     // This ensures consistent ordering in the database
     const sortedImages = [
       imagesToInsert[primaryIndex], // Primary image with display_order = 0
-      ...imagesToInsert.filter((_, idx) => idx !== primaryIndex), // Other images
-    ].map((img, idx) => ({
+      ...imagesToInsert.filter((_: any, idx: number) => idx !== primaryIndex), // Other images
+    ].map((img: any, idx: number) => ({
       ...img,
       display_order: idx, // Ensure sequential ordering: 0, 1, 2, 3...
     }));

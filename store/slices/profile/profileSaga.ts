@@ -4,7 +4,7 @@ import { apiInterceptor } from '../../api/interceptor';
 import { profileActions } from './profileSlice';
 import type { User } from '@/types';
 
-function* fetchProfileSaga() {
+function* fetchProfileSaga(): Generator<any, void, unknown> {
   try {
     const config = {
       url: '/profile',
@@ -13,7 +13,7 @@ function* fetchProfileSaga() {
 
     const interceptedConfig = apiInterceptor.request(config);
     const response = yield call(apiClient.request, interceptedConfig);
-    const transformedData = apiInterceptor.response(response);
+    const transformedData = apiInterceptor.response(response as any);
 
     yield put(profileActions.fetchProfileSuccess(transformedData));
   } catch (error: any) {
@@ -22,7 +22,7 @@ function* fetchProfileSaga() {
   }
 }
 
-function* updateProfileSaga(action: ReturnType<typeof profileActions.updateProfileRequest>) {
+function* updateProfileSaga(action: ReturnType<typeof profileActions.updateProfileRequest>): Generator<any, void, unknown> {
   try {
     const config = {
       url: '/profile',
@@ -32,7 +32,7 @@ function* updateProfileSaga(action: ReturnType<typeof profileActions.updateProfi
 
     const interceptedConfig = apiInterceptor.request(config);
     const response = yield call(apiClient.request, interceptedConfig);
-    const transformedData = apiInterceptor.response(response);
+    const transformedData = apiInterceptor.response(response as any);
 
     yield put(profileActions.updateProfileSuccess(transformedData));
   } catch (error: any) {
@@ -41,7 +41,7 @@ function* updateProfileSaga(action: ReturnType<typeof profileActions.updateProfi
   }
 }
 
-export function* profileSaga() {
+export function* profileSaga(): Generator<any, void, unknown> {
   yield takeLatest(profileActions.fetchProfileRequest.type, fetchProfileSaga);
   yield takeEvery(profileActions.updateProfileRequest.type, updateProfileSaga);
 }

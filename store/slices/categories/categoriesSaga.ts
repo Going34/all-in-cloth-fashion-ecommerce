@@ -3,7 +3,7 @@ import { apiClient } from '../../api/client';
 import { apiInterceptor } from '../../api/interceptor';
 import { categoriesActions } from './categoriesSlice';
 
-function* fetchCategoriesSaga() {
+function* fetchCategoriesSaga(): Generator<any, void, unknown> {
   try {
     const config = {
       url: '/admin/categories',
@@ -12,7 +12,7 @@ function* fetchCategoriesSaga() {
 
     const interceptedConfig = apiInterceptor.request(config);
     const response = yield call(apiClient.request, interceptedConfig);
-    const transformedData = apiInterceptor.response(response);
+    const transformedData = apiInterceptor.response(response as any);
 
     yield put(categoriesActions.fetchCategoriesDataSuccess(transformedData));
   } catch (error: any) {
@@ -21,7 +21,7 @@ function* fetchCategoriesSaga() {
   }
 }
 
-function* createCategorySaga(action: ReturnType<typeof categoriesActions.createCategoryRequest>) {
+function* createCategorySaga(action: ReturnType<typeof categoriesActions.createCategoryRequest>): Generator<any, void, unknown> {
   try {
     const config = {
       url: '/admin/categories',
@@ -34,7 +34,7 @@ function* createCategorySaga(action: ReturnType<typeof categoriesActions.createC
 
     const interceptedConfig = apiInterceptor.request(config);
     const response = yield call(apiClient.request, interceptedConfig);
-    const transformedData = apiInterceptor.response(response);
+    const transformedData = apiInterceptor.response(response as any);
 
     yield put(categoriesActions.createCategorySuccess(transformedData));
     
@@ -46,7 +46,7 @@ function* createCategorySaga(action: ReturnType<typeof categoriesActions.createC
   }
 }
 
-export function* categoriesSaga() {
+export function* categoriesSaga(): Generator<any, void, unknown> {
   yield takeEvery(categoriesActions.fetchCategoriesDataRequest.type, fetchCategoriesSaga);
   yield takeEvery(categoriesActions.createCategoryRequest.type, createCategorySaga);
 }

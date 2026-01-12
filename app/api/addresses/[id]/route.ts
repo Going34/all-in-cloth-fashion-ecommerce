@@ -7,21 +7,22 @@ import type { Address, AddressInput } from '@/types';
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params;
     const user = await requireAuth();
     const supabase = await getDbClient();
 
     const { data, error } = await supabase
       .from('addresses')
       .select('*')
-      .eq('id', params.id)
+      .eq('id', id)
       .eq('user_id', user.id)
       .single();
 
     if (error || !data) {
-      throw new NotFoundError('Address', params.id);
+      throw new NotFoundError('Address', id);
     }
 
     return successResponse(data as Address);
@@ -32,9 +33,10 @@ export async function GET(
 
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params;
     const user = await requireAuth();
     const body = await request.json();
     const updates: Partial<AddressInput> = {};
@@ -54,12 +56,12 @@ export async function PUT(
     const { data: existing } = await supabase
       .from('addresses')
       .select('id')
-      .eq('id', params.id)
+      .eq('id', id)
       .eq('user_id', user.id)
       .single();
 
     if (!existing) {
-      throw new NotFoundError('Address', params.id);
+      throw new NotFoundError('Address', id);
     }
 
     // If setting as default, remove default from others
@@ -73,7 +75,7 @@ export async function PUT(
     const { data, error } = await supabase
       .from('addresses')
       .update(updates as any)
-      .eq('id', params.id)
+      .eq('id', id)
       .eq('user_id', user.id)
       .select()
       .single();
@@ -90,9 +92,10 @@ export async function PUT(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params;
     const user = await requireAuth();
     const supabase = await getDbClient();
 
@@ -100,18 +103,18 @@ export async function DELETE(
     const { data: existing } = await supabase
       .from('addresses')
       .select('id')
-      .eq('id', params.id)
+      .eq('id', id)
       .eq('user_id', user.id)
       .single();
 
     if (!existing) {
-      throw new NotFoundError('Address', params.id);
+      throw new NotFoundError('Address', id);
     }
 
     const { error } = await supabase
       .from('addresses')
       .delete()
-      .eq('id', params.id)
+      .eq('id', id)
       .eq('user_id', user.id);
 
     if (error) {

@@ -3,7 +3,7 @@ import { apiClient } from '../../api/client';
 import { apiInterceptor } from '../../api/interceptor';
 import { teamActions } from './teamSlice';
 
-function* fetchTeamSaga() {
+function* fetchTeamSaga(): Generator<any, void, unknown> {
   try {
     const config = {
       url: '/admin/team',
@@ -12,7 +12,7 @@ function* fetchTeamSaga() {
 
     const interceptedConfig = apiInterceptor.request(config);
     const response = yield call(apiClient.request, interceptedConfig);
-    const transformedData = apiInterceptor.response(response);
+    const transformedData = apiInterceptor.response(response as any);
 
     yield put(teamActions.fetchTeamDataSuccess(transformedData));
   } catch (error: any) {
@@ -21,7 +21,7 @@ function* fetchTeamSaga() {
   }
 }
 
-function* inviteTeamMemberSaga(action: ReturnType<typeof teamActions.inviteTeamMemberRequest>) {
+function* inviteTeamMemberSaga(action: ReturnType<typeof teamActions.inviteTeamMemberRequest>): Generator<any, void, unknown> {
   try {
     const config = {
       url: '/admin/team/invite',
@@ -31,7 +31,7 @@ function* inviteTeamMemberSaga(action: ReturnType<typeof teamActions.inviteTeamM
 
     const interceptedConfig = apiInterceptor.request(config);
     const response = yield call(apiClient.request, interceptedConfig);
-    const transformedData = apiInterceptor.response(response);
+    const transformedData = apiInterceptor.response(response as any);
 
     yield put(teamActions.inviteTeamMemberSuccess(transformedData));
   } catch (error: any) {
@@ -40,7 +40,7 @@ function* inviteTeamMemberSaga(action: ReturnType<typeof teamActions.inviteTeamM
   }
 }
 
-function* updateTeamMemberRoleSaga(action: ReturnType<typeof teamActions.updateTeamMemberRoleRequest>) {
+function* updateTeamMemberRoleSaga(action: ReturnType<typeof teamActions.updateTeamMemberRoleRequest>): Generator<any, void, unknown> {
   try {
     const config = {
       url: `/admin/team/${action.payload.userId}/role`,
@@ -50,7 +50,7 @@ function* updateTeamMemberRoleSaga(action: ReturnType<typeof teamActions.updateT
 
     const interceptedConfig = apiInterceptor.request(config);
     const response = yield call(apiClient.request, interceptedConfig);
-    const transformedData = apiInterceptor.response(response);
+    const transformedData = apiInterceptor.response(response as any);
 
     yield put(teamActions.updateTeamMemberRoleSuccess(transformedData));
   } catch (error: any) {
@@ -59,7 +59,7 @@ function* updateTeamMemberRoleSaga(action: ReturnType<typeof teamActions.updateT
   }
 }
 
-function* removeTeamMemberSaga(action: ReturnType<typeof teamActions.removeTeamMemberRequest>) {
+function* removeTeamMemberSaga(action: ReturnType<typeof teamActions.removeTeamMemberRequest>): Generator<any, void, unknown> {
   try {
     const config = {
       url: `/admin/team/${action.payload}`,
@@ -76,7 +76,7 @@ function* removeTeamMemberSaga(action: ReturnType<typeof teamActions.removeTeamM
   }
 }
 
-export function* teamSaga() {
+export function* teamSaga(): Generator<any, void, unknown> {
   yield takeEvery(teamActions.fetchTeamDataRequest.type, fetchTeamSaga);
   yield takeEvery(teamActions.inviteTeamMemberRequest.type, inviteTeamMemberSaga);
   yield takeEvery(teamActions.updateTeamMemberRoleRequest.type, updateTeamMemberRoleSaga);

@@ -356,7 +356,6 @@ export async function findOrderByIdAdmin(id: string): Promise<any | null> {
     },
     subtotal: order.subtotal,
     tax: order.tax,
-    shipping: order.shipping,
     total: order.total,
     createdAt: order.created_at,
     updatedAt: order.updated_at,

@@ -4,7 +4,7 @@ import { apiInterceptor } from '../../api/interceptor';
 import { wishlistActions } from './wishlistSlice';
 import type { Product } from '@/types';
 
-function* fetchWishlistSaga() {
+function* fetchWishlistSaga(): Generator<any, void, unknown> {
   try {
     const config = {
       url: '/wishlist',
@@ -13,7 +13,7 @@ function* fetchWishlistSaga() {
 
     const interceptedConfig = apiInterceptor.request(config);
     const response = yield call(apiClient.request, interceptedConfig);
-    const transformedData = apiInterceptor.response(response);
+    const transformedData = apiInterceptor.response(response as any);
 
     const wishlist = Array.isArray(transformedData) ? transformedData : [];
 
@@ -24,7 +24,7 @@ function* fetchWishlistSaga() {
   }
 }
 
-function* addToWishlistSaga(action: ReturnType<typeof wishlistActions.addToWishlistRequest>) {
+function* addToWishlistSaga(action: ReturnType<typeof wishlistActions.addToWishlistRequest>): Generator<any, void, unknown> {
   try {
     const config = {
       url: '/wishlist',
@@ -36,7 +36,7 @@ function* addToWishlistSaga(action: ReturnType<typeof wishlistActions.addToWishl
 
     const interceptedConfig = apiInterceptor.request(config);
     const response = yield call(apiClient.request, interceptedConfig);
-    const transformedData = apiInterceptor.response(response);
+    const transformedData = apiInterceptor.response(response as any);
 
     // After adding, fetch the updated wishlist to get the full product data
     yield put(wishlistActions.fetchWishlistRequest());
@@ -46,7 +46,7 @@ function* addToWishlistSaga(action: ReturnType<typeof wishlistActions.addToWishl
   }
 }
 
-function* removeFromWishlistSaga(action: ReturnType<typeof wishlistActions.removeFromWishlistRequest>) {
+function* removeFromWishlistSaga(action: ReturnType<typeof wishlistActions.removeFromWishlistRequest>): Generator<any, void, unknown> {
   try {
     const config = {
       url: '/wishlist',
@@ -58,7 +58,7 @@ function* removeFromWishlistSaga(action: ReturnType<typeof wishlistActions.remov
 
     const interceptedConfig = apiInterceptor.request(config);
     const response = yield call(apiClient.request, interceptedConfig);
-    const transformedData = apiInterceptor.response(response);
+    const transformedData = apiInterceptor.response(response as any);
 
     yield put(wishlistActions.removeFromWishlistSuccess(action.payload));
   } catch (error: any) {
@@ -67,7 +67,7 @@ function* removeFromWishlistSaga(action: ReturnType<typeof wishlistActions.remov
   }
 }
 
-export function* wishlistSaga() {
+export function* wishlistSaga(): Generator<any, void, unknown> {
   yield takeLatest(wishlistActions.fetchWishlistRequest.type, fetchWishlistSaga);
   yield takeEvery(wishlistActions.addToWishlistRequest.type, addToWishlistSaga);
   yield takeEvery(wishlistActions.removeFromWishlistRequest.type, removeFromWishlistSaga);

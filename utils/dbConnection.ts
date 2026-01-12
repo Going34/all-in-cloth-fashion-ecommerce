@@ -1,5 +1,4 @@
 import { createClient } from '@/utils/supabase/client';
-import { createClient as createServerClient } from '@/utils/supabase/server';
 
 export interface ConnectionStatus {
   connected: boolean;
@@ -74,70 +73,9 @@ export async function testDatabaseConnection(): Promise<ConnectionStatus> {
   }
 }
 
-/**
- * Test database connection (Server-side)
- * Use this in server components, API routes, or server actions
- */
-export async function testDatabaseConnectionServer(): Promise<ConnectionStatus> {
-  const timestamp = new Date().toISOString();
-  
-  try {
-    const supabase = await createServerClient();
-    
-    // Test basic connection
-    const { data, error, count } = await supabase
-      .from('products')
-      .select('*', { count: 'exact', head: true });
-
-    if (error) {
-      // Try users table as fallback
-      const { error: usersError } = await supabase
-        .from('users')
-        .select('*', { count: 'exact', head: true });
-
-      if (usersError) {
-        return {
-          connected: false,
-          error: error.message || usersError.message,
-          message: 'Failed to connect to database. Tables may not exist yet.',
-          timestamp,
-        };
-      }
-    }
-
-    // Get list of available tables
-    const tables: string[] = [];
-    const commonTables = [
-      'users', 'products', 'categories', 'orders', 
-      'inventory', 'product_variants', 'cart_items',
-      'addresses', 'reviews', 'payments', 'wishlist'
-    ];
-
-    for (const table of commonTables) {
-      const { error: tableError } = await supabase
-        .from(table)
-        .select('*', { count: 'exact', head: true });
-      
-      if (!tableError) {
-        tables.push(table);
-      }
-    }
-
-    return {
-      connected: true,
-      message: `Successfully connected to Supabase database. Found ${tables.length} accessible tables.`,
-      timestamp,
-      tables,
-    };
-  } catch (error) {
-    return {
-      connected: false,
-      error: error instanceof Error ? error.message : 'Unknown error',
-      message: 'Failed to establish database connection.',
-      timestamp,
-    };
-  }
-}
+// Server-side connection test has been moved to dbConnection.server.ts
+// Import it directly in server components, API routes, or server actions:
+// import { testDatabaseConnectionServer } from '@/utils/dbConnection.server';
 
 /**
  * Check if Supabase environment variables are configured
@@ -170,12 +108,12 @@ export function checkSupabaseConfig(): {
 }
 
 /**
- * Comprehensive connection test with detailed diagnostics
+ * Comprehensive connection test with detailed diagnostics (Client-side only)
+ * For server-side diagnostics, use the API route /api/test-connection or testDatabaseConnectionServer()
  */
 export async function diagnoseConnection(): Promise<{
   config: ReturnType<typeof checkSupabaseConfig>;
   clientTest?: ConnectionStatus;
-  serverTest?: ConnectionStatus;
 }> {
   const config = checkSupabaseConfig();
   
@@ -183,16 +121,14 @@ export async function diagnoseConnection(): Promise<{
     return { config };
   }
 
-  // Test both client and server connections
-  const [clientTest, serverTest] = await Promise.allSettled([
+  // Test client connection only
+  const clientTestResult = await Promise.allSettled([
     testDatabaseConnection(),
-    testDatabaseConnectionServer(),
   ]);
 
   return {
     config,
-    clientTest: clientTest.status === 'fulfilled' ? clientTest.value : undefined,
-    serverTest: serverTest.status === 'fulfilled' ? serverTest.value : undefined,
+    clientTest: clientTestResult[0].status === 'fulfilled' ? clientTestResult[0].value : undefined,
   };
 }
 
