@@ -71,7 +71,23 @@ export const apiInterceptor = {
         if (typeof window !== 'undefined') {
           localStorage.removeItem('auth_token');
           sessionStorage.removeItem('auth_token');
-          window.location.href = '/admin/login';
+          
+          // Check if user is on an admin page - redirect to appropriate login
+          // Use pathname without query params for more reliable detection
+          const currentPath = window.location.pathname || '/';
+          const isAdminPath = currentPath.startsWith('/admin') && !currentPath.startsWith('/admin/login');
+          
+          // Only redirect to admin login if on admin pages, otherwise redirect to regular login
+          const loginPath = isAdminPath ? '/admin/login' : '/login';
+          
+          // Preserve the current path as redirect parameter for regular users
+          // Only add redirect param if not already on login page to avoid loops
+          if (!isAdminPath && !currentPath.startsWith('/login') && !currentPath.startsWith('/signup')) {
+            const redirectUrl = `${loginPath}?from=${encodeURIComponent(currentPath)}`;
+            window.location.href = redirectUrl;
+          } else if (isAdminPath) {
+            window.location.href = loginPath;
+          }
         }
         return {
           message: 'Unauthorized. Please login again.',
