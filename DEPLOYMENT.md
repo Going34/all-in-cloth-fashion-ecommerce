@@ -108,3 +108,48 @@ Make sure to set these environment variables in Cloud Run:
 2. **Runtime errors**: Check Cloud Run logs: `gcloud run services logs read all-in-cloth`
 3. **Database connection issues**: Verify Supabase connection settings and network access
 
+### Common Production Issues
+
+#### "TypeError: fetch failed" or "Database connection failed"
+
+This error typically occurs when the server cannot connect to Supabase. Check the following:
+
+1. **Environment Variables** - Verify all Supabase environment variables are set:
+   ```bash
+   gcloud run services describe all-in-cloth --region=asia-south1 --format="value(spec.template.spec.containers[0].env)"
+   ```
+
+2. **Supabase URL Format** - Ensure the URL is correct:
+   - Should be: `https://your-project-id.supabase.co`
+   - Must start with `https://`
+   - No trailing slash
+
+3. **Network Connectivity** - Cloud Run should be able to reach Supabase:
+   - Supabase is a public API, so no special network config needed
+   - Check if your Supabase project is paused (free tier projects pause after inactivity)
+   - Verify Supabase project is active in Supabase dashboard
+
+4. **Check Logs** - View detailed error logs:
+   ```bash
+   gcloud run services logs read all-in-cloth --region=asia-south1 --limit=50
+   ```
+
+5. **Test Connection** - Use the test endpoint:
+   ```bash
+   curl https://your-app-url/api/test-connection
+   ```
+
+6. **Update Environment Variables** - If missing, set them:
+   ```bash
+   gcloud run services update all-in-cloth \
+     --update-env-vars="NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co,NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key" \
+     --region=asia-south1
+   ```
+
+#### 500 Internal Server Error on API Routes
+
+1. Check Cloud Run logs for detailed error messages
+2. Verify all environment variables are set correctly
+3. Ensure Supabase project is not paused
+4. Check if database tables exist and migrations are applied
+

@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server';
 import { successResponse, errorResponse } from '@/lib/response';
 import { requireAuth } from '@/lib/auth';
-import { getDbClient } from '@/lib/db';
+import { getAdminDbClient } from '@/lib/adminDb';
 import { NotFoundError } from '@/lib/errors';
 import type { Address } from '@/types';
 
@@ -12,10 +12,10 @@ export async function PUT(
   try {
     const { id } = await params;
     const user = await requireAuth();
-    const supabase = await getDbClient();
+    const db = getAdminDbClient();
 
     // Check if address exists and belongs to user
-    const { data: existing } = await supabase
+    const { data: existing } = await db
       .from('addresses')
       .select('id')
       .eq('id', id)
@@ -27,13 +27,13 @@ export async function PUT(
     }
 
     // Remove default from all addresses
-    await supabase
+    await db
       .from('addresses')
       .update({ is_default: false } as any)
       .eq('user_id', user.id);
 
     // Set new default
-    const { data, error } = await supabase
+    const { data, error } = await db
       .from('addresses')
       .update({ is_default: true } as any)
       .eq('id', id)

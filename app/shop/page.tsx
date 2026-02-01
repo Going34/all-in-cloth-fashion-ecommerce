@@ -7,7 +7,7 @@ import { Filter, SlidersHorizontal, Search, ChevronDown, Star } from 'lucide-rea
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import { productsActions } from '../../store/slices/products/productsSlice';
 import { categoriesActions } from '../../store/slices/categories/categoriesSlice';
-import { selectProducts, selectProductsLoading, selectProductsError } from '../../store/slices/products/productsSelectors';
+import { selectProducts, selectProductsLoading, selectProductsError, selectProductsLoaded, selectProductsCache } from '../../store/slices/products/productsSelectors';
 import { selectCategories } from '../../store/slices/categories/categoriesSelectors';
 import { Category, Product } from '../../types';
 import { formatCurrency, formatPriceRange } from '../../utils/currency';
@@ -19,6 +19,8 @@ function ShopContent() {
   const products = useAppSelector(selectProducts);
   const productsLoading = useAppSelector(selectProductsLoading);
   const productsError = useAppSelector(selectProductsError);
+  const productsLoaded = useAppSelector(selectProductsLoaded);
+  const productsCache = useAppSelector(selectProductsCache);
   const categories = useAppSelector(selectCategories);
   
   const categoryParam = searchParams.get('category');
@@ -30,16 +32,35 @@ function ShopContent() {
     dispatch(categoriesActions.fetchCategoriesDataRequest());
   }, [dispatch]);
 
+  // Update selected category from URL params
   useEffect(() => {
     const cat = searchParams.get('category');
-    setSelectedCategoryId(cat || null);
-    
-    const filters: any = { status: 'live' };
-    if (cat) {
-      filters.categoryId = cat;
+    if (cat !== selectedCategoryId) {
+      setSelectedCategoryId(cat || null);
     }
-    dispatch(productsActions.fetchUserProductsRequest(filters));
-  }, [dispatch, searchParams]);
+  }, [searchParams, selectedCategoryId]);
+
+  // Handle product fetching
+  useEffect(() => {
+    const cat = searchParams.get('category');
+    
+    // Only fetch if products haven't been loaded yet
+    if (!productsLoaded || Object.keys(productsCache).length === 0) {
+      const filters: { status: 'live'; categoryId?: string } = { status: 'live' };
+      if (cat) {
+        filters.categoryId = cat;
+      }
+      dispatch(productsActions.fetchUserProductsRequest(filters));
+    } else {
+      // Products already loaded, just filter from Redux state
+      const filters: { status: 'live'; categoryId?: string } = { status: 'live' };
+      if (cat) {
+        filters.categoryId = cat;
+      }
+      // Dispatch with filters to trigger filtering in saga (which will use cache)
+      dispatch(productsActions.fetchUserProductsRequest(filters));
+    }
+  }, [dispatch, searchParams, productsLoaded, productsCache, selectedCategoryId]);
 
   const getProductPrice = (product: Product): number => {
     if (product.variants && product.variants.length > 0) {
@@ -74,7 +95,7 @@ function ShopContent() {
   };
 
   const filteredProducts = useMemo(() => {
-    let filtered = products.filter(p => {
+    const filtered = products.filter(p => {
       const product = p as Product;
       const isNewArrival = searchParams.get('filter') === 'new' ? product.featured : true;
       const matchesCat = matchesCategory(product, selectedCategoryId);
@@ -105,10 +126,12 @@ function ShopContent() {
       params.set('category', categoryId);
     }
     
-    const filters: any = { status: 'live' };
+    // Products are already loaded, just filter from Redux state
+    const filters: { status: 'live'; categoryId?: string } = { status: 'live' };
     if (categoryId) {
       filters.categoryId = categoryId;
     }
+    // Dispatch to trigger filtering in saga (which will use cache)
     dispatch(productsActions.fetchUserProductsRequest(filters));
     
     router.push(`/shop?${params.toString()}`);

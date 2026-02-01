@@ -25,3 +25,6 @@ export * from './reviewService';
 // Coupon services
 export * from './couponService';
 
+// Razorpay services
+export * from './razorpayService';
+

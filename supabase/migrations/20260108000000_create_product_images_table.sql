@@ -18,3 +18,6 @@ COMMENT ON TABLE product_images IS 'Stores product-level images with display ord
 
 
 
+
+
+

@@ -7,6 +7,7 @@ import { AuthProvider } from '../context/AuthContext';
 import { CartProvider } from '../context/CartContext';
 import { WishlistProvider } from '../context/WishlistContext';
 import { InventoryProvider } from '../context/InventoryContext';
+import { WebhookProvider } from '../context/WebhookContext';
 
 export function Providers({ children }: { children: React.ReactNode }) {
   return (
@@ -15,7 +16,9 @@ export function Providers({ children }: { children: React.ReactNode }) {
         <CartProvider>
           <WishlistProvider>
             <InventoryProvider>
-              {children}
+              <WebhookProvider>
+                {children}
+              </WebhookProvider>
             </InventoryProvider>
           </WishlistProvider>
         </CartProvider>

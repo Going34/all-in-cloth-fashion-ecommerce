@@ -138,6 +138,11 @@ const ordersSlice = createSlice({
       state.loading = false;
       state.error = action.payload;
     },
+    // Batch update from userData
+    batchUpdateOrders: (state, action: PayloadAction<Order[]>) => {
+      state.data = action.payload;
+      state.error = null;
+    },
   },
 });
 

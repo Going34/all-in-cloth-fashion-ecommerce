@@ -1,4 +1,5 @@
 import { NotFoundError, ValidationError } from '@/lib/errors';
+import { getAdminDbClient } from '@/lib/adminDb';
 import { findOrderById, createOrder as createOrderRepo, findOrdersAdmin, findOrderByIdAdmin, findOrdersByUserId, updateOrderStatusAdmin as updateOrderStatusAdminRepo } from './order.repository';
 import type { CreateOrderRequest, OrderResponse, AdminOrderListQuery, AdminOrderListResponse } from './order.types';
 import type { OrderStatus } from '@/types';
@@ -24,9 +25,10 @@ export async function listOrders(userId: string, filters?: { status?: OrderStatu
 export async function createOrder(
   userId: string,
   data: CreateOrderRequest,
-  shippingAmount: number = 0
+  shippingAmount: number = 0,
+  idempotencyKey?: string
 ): Promise<OrderResponse> {
-  return await createOrderRepo(userId, data, shippingAmount);
+  return await createOrderRepo(userId, data, shippingAmount, idempotencyKey);
 }
 
 export async function listOrdersAdmin(query: AdminOrderListQuery): Promise<AdminOrderListResponse> {
@@ -56,7 +58,7 @@ export async function listOrdersAdmin(query: AdminOrderListQuery): Promise<Admin
   };
 }
 
-export async function getOrderAdmin(id: string): Promise<any> {
+export async function getOrderAdmin(id: string): Promise<unknown> {
   const order = await findOrderByIdAdmin(id);
 
   if (!order) {
@@ -78,14 +80,25 @@ export async function updateOrderStatusAdmin(
   id: string,
   status: OrderStatus,
   notes?: string
-): Promise<any> {
-  const order = await findOrderByIdAdmin(id);
+): Promise<unknown> {
+  const db = getAdminDbClient();
+  
+  const { data: existingOrder, error: fetchError } = await db
+    .from('orders')
+    .select('id, status')
+    .eq('id', id)
+    .single();
 
-  if (!order) {
+  if (fetchError || !existingOrder) {
     throw new NotFoundError('Order', id);
   }
 
-  const currentStatus = order.status as OrderStatus;
+  const currentStatus = existingOrder.status as OrderStatus;
+  
+  if (currentStatus === status) {
+    return await findOrderByIdAdmin(id);
+  }
+
   const allowedStatuses = validStatusTransitions[currentStatus];
 
   if (!allowedStatuses.includes(status)) {

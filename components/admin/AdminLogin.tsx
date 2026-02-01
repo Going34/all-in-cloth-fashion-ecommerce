@@ -4,17 +4,20 @@ import React, { useState, useEffect } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '../../context/AuthContext';
-import { Lock, Mail, ShieldCheck, ArrowRight, Loader2, Info } from 'lucide-react';
+import { Phone, KeyRound, ShieldCheck, ArrowRight, Loader2, Info, RefreshCw } from 'lucide-react';
 
 const AdminLogin: React.FC = () => {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [countryCode, setCountryCode] = useState('91');
+  const [phone, setPhone] = useState('');
+  const [otp, setOtp] = useState('');
+  const [reqId, setReqId] = useState(''); // MSG91 Widget API requires this
+  const [step, setStep] = useState<'phone' | 'otp'>('phone');
   const [isAuthenticating, setIsAuthenticating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
   const pathname = usePathname();
-  
-  const { login, isLoading, isAuthenticated, isAdmin } = useAuth();
+
+  const { sendOtp, verifyOtp, isLoading, isAuthenticated, isAdmin, logout } = useAuth();
 
   useEffect(() => {
     if (!isLoading && isAuthenticated && isAdmin && pathname === '/admin/login') {
@@ -22,25 +25,81 @@ const AdminLogin: React.FC = () => {
     }
   }, [isLoading, isAuthenticated, isAdmin, pathname, router]);
 
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSendOtp = async () => {
     setIsAuthenticating(true);
     setError(null);
-    
+
     try {
-      const { error } = await login(email, password);
-      
-      if (error) {
-        setError(error.message || 'Login failed. Please check your credentials.');
-        setIsAuthenticating(false);
+      const result = await sendOtp(phone, countryCode);
+
+      if (result.error) {
+        setError(result.error.message || 'Failed to send OTP.');
         return;
       }
-      
+
+      if (result.loggedIn) {
+        if (!isAdmin) {
+          await logout();
+          setError('Admin access required.');
+          return;
+        }
+        router.push('/admin/dashboard');
+        return;
+      }
+
+      if (result.otpRequired && result.reqId) {
+        setReqId(result.reqId);
+        setStep('otp');
+        return;
+      }
+
+      setError('Unable to continue. Please try again.');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'An unexpected error occurred');
+    } finally {
+      setIsAuthenticating(false);
+    }
+  };
+
+  const handleVerifyOtp = async () => {
+    setIsAuthenticating(true);
+    setError(null);
+
+    try {
+      const result = await verifyOtp({ phone, countryCode, otp, reqId });
+
+      if (result.error) {
+        setError(result.error.message || 'OTP verification failed.');
+        return;
+      }
+
+      if (!isAdmin) {
+        await logout();
+        setError('Admin access required.');
+        return;
+      }
+
       router.push('/admin/dashboard');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An unexpected error occurred');
+    } finally {
       setIsAuthenticating(false);
     }
+  };
+
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (step === 'phone') {
+      await handleSendOtp();
+    } else {
+      await handleVerifyOtp();
+    }
+  };
+
+  const handleResendOtp = async () => {
+    setOtp('');
+    await handleSendOtp();
   };
 
   if (isLoading) {
@@ -77,36 +136,63 @@ const AdminLogin: React.FC = () => {
                 {error}
               </div>
             )}
-            
+
             <div className="space-y-3">
-              <label className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-500 ml-1">Admin Email</label>
-              <div className="relative group">
-                <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-600 group-focus-within:text-indigo-400 transition-colors" size={18} />
+              <label className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-500 ml-1">Phone Number</label>
+              <div className="flex gap-3">
                 <input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="w-full pl-12 pr-4 py-4 bg-slate-950/50 border border-slate-800 rounded-2xl text-white placeholder:text-slate-600 outline-none focus:border-indigo-500/50 focus:ring-1 focus:ring-indigo-500/30 transition-all"
-                  placeholder="admin@allincloth.com"
+                  type="text"
+                  inputMode="numeric"
+                  value={countryCode}
+                  onChange={(e) => setCountryCode(e.target.value)}
+                  className="w-28 px-4 py-4 bg-slate-950/50 border border-slate-800 rounded-2xl text-white placeholder:text-slate-600 outline-none focus:border-indigo-500/50 focus:ring-1 focus:ring-indigo-500/30 transition-all"
+                  placeholder="Code"
                   required
+                  disabled={step === 'otp' || isAuthenticating}
                 />
+                <div className="relative group flex-1">
+                  <Phone className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-600 group-focus-within:text-indigo-400 transition-colors" size={18} />
+                  <input
+                    type="text"
+                    inputMode="tel"
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                    className="w-full pl-12 pr-4 py-4 bg-slate-950/50 border border-slate-800 rounded-2xl text-white placeholder:text-slate-600 outline-none focus:border-indigo-500/50 focus:ring-1 focus:ring-indigo-500/30 transition-all"
+                    placeholder="Phone number"
+                    required
+                    disabled={step === 'otp' || isAuthenticating}
+                  />
+                </div>
               </div>
             </div>
 
-            <div className="space-y-3">
-              <label className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-500 ml-1">Password</label>
-              <div className="relative group">
-                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-600 group-focus-within:text-indigo-400 transition-colors" size={18} />
-                <input
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="w-full pl-12 pr-4 py-4 bg-slate-950/50 border border-slate-800 rounded-2xl text-white placeholder:text-slate-600 outline-none focus:border-indigo-500/50 focus:ring-1 focus:ring-indigo-500/30 transition-all"
-                  placeholder="••••••••"
-                  required
-                />
-              </div>
-            </div>
+            {step === 'otp' && (
+              <>
+                <div className="relative group">
+                  <KeyRound className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-600 group-focus-within:text-indigo-400 transition-colors" size={18} />
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    value={otp}
+                    onChange={(e) => setOtp(e.target.value)}
+                    className="w-full pl-12 pr-4 py-4 bg-slate-950/50 border border-slate-800 rounded-2xl text-white placeholder:text-slate-600 outline-none focus:border-indigo-500/50 focus:ring-1 focus:ring-indigo-500/30 transition-all"
+                    placeholder="Enter OTP"
+                    required
+                    disabled={isAuthenticating}
+                    maxLength={6}
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={handleResendOtp}
+                  disabled={isAuthenticating}
+                  className="text-sm text-slate-400 hover:text-indigo-400 flex items-center gap-1 transition-colors disabled:opacity-50"
+                >
+                  <RefreshCw size={14} />
+                  Resend OTP
+                </button>
+              </>
+            )}
 
             <button
               type="submit"
@@ -120,12 +206,22 @@ const AdminLogin: React.FC = () => {
                 </>
               ) : (
                 <>
-                  <span>Access Dashboard</span>
+                  <span>{step === 'phone' ? 'Send OTP' : 'Verify & Access'}</span>
                   <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" />
                 </>
               )}
             </button>
           </form>
+
+          {step === 'otp' && (
+            <button
+              type="button"
+              onClick={() => { setStep('phone'); setOtp(''); setReqId(''); }}
+              className="w-full mt-4 text-center text-sm text-slate-500 hover:text-slate-300 transition-colors"
+            >
+              ← Change phone number
+            </button>
+          )}
 
           <div className="mt-8 pt-8 border-t border-slate-800/50 space-y-3">
             <p className="text-slate-500 text-xs flex items-center justify-center space-x-2">
@@ -135,9 +231,7 @@ const AdminLogin: React.FC = () => {
             {typeof window !== 'undefined' && process.env.NODE_ENV === 'development' && (
               <div className="p-3 bg-slate-800/50 border border-slate-700/50 rounded-lg">
                 <p className="text-slate-400 text-xs font-mono text-center">
-                  <span className="text-slate-500">Dev Mode:</span> Default admin credentials
-                  <br />
-                  <span className="text-indigo-400">admin@allincloth.com</span> / <span className="text-indigo-400">Admin@123</span>
+                  <span className="text-slate-500">Dev Mode:</span> Use phone OTP for admin login
                   <br />
                   <span className="text-slate-500 text-[10px]">Run: npm run create:admin</span>
                 </p>

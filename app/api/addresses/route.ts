@@ -1,15 +1,15 @@
 import { NextRequest } from 'next/server';
 import { successResponse, errorResponse } from '@/lib/response';
 import { requireAuth } from '@/lib/auth';
-import { getDbClient } from '@/lib/db';
+import { getAdminDbClient } from '@/lib/adminDb';
 import type { Address, AddressInput } from '@/types';
 
 export async function GET(request: NextRequest) {
   try {
     const user = await requireAuth();
-    const supabase = await getDbClient();
+    const db = getAdminDbClient();
 
-    const { data, error } = await supabase
+    const { data, error } = await db
       .from('addresses')
       .select('*')
       .eq('user_id', user.id)
@@ -45,17 +45,17 @@ export async function POST(request: NextRequest) {
       return errorResponse(new Error('All address fields including phone number are required'), 400);
     }
 
-    const supabase = await getDbClient();
+    const db = getAdminDbClient();
 
     // If this is marked as default, update others
     if (addressData.is_default) {
-      await supabase
+      await db
         .from('addresses')
         .update({ is_default: false } as any)
         .eq('user_id', user.id);
     }
 
-    const { data, error } = await supabase
+    const { data, error } = await db
       .from('addresses')
       .insert({
         user_id: user.id,

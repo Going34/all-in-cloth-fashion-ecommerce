@@ -23,6 +23,12 @@ export interface SettingsResponse {
       enabled: boolean;
       clientId?: string;
     };
+    razorpay: {
+      enabled: boolean;
+      keyId?: string;
+      keySecret?: string;
+      webhookSecret?: string;
+    };
     applePay: {
       enabled: boolean;
     };
@@ -50,6 +56,7 @@ export interface UpdateSettingsRequest {
   paymentMethods?: {
     stripe?: { enabled: boolean };
     paypal?: { enabled: boolean };
+    razorpay?: { enabled: boolean; keyId?: string; keySecret?: string; webhookSecret?: string };
     applePay?: { enabled: boolean };
     googlePay?: { enabled: boolean };
   };

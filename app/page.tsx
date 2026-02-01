@@ -16,7 +16,8 @@ export default function Home() {
   const error = useAppSelector(selectProductsError);
 
   useEffect(() => {
-    dispatch(productsActions.fetchUserProductsRequest({ status: 'live', limit: 20 }));
+    // Fetch all live products on home page (no limit to get all products for caching)
+    dispatch(productsActions.fetchUserProductsRequest({ status: 'live' }));
   }, [dispatch]);
 
   const featured = products

@@ -35,6 +35,7 @@ const AdminSettings: React.FC = () => {
     paymentMethods: {
       stripe: { enabled: false },
       paypal: { enabled: false },
+      razorpay: { enabled: false, keyId: '', keySecret: '', webhookSecret: '' },
       applePay: { enabled: false },
       googlePay: { enabled: false },
     },
@@ -51,14 +52,30 @@ const AdminSettings: React.FC = () => {
 
   useEffect(() => {
     if (settings) {
-      setLocalSettings({
+      const paymentMethodsFromSettings =
+        settings.paymentMethods && typeof settings.paymentMethods === 'object'
+          ? (settings.paymentMethods as Record<string, unknown>)
+          : undefined;
+
+      setLocalSettings((prev) => ({
+        ...prev,
         ...settings,
         shipping: {
+          ...prev.shipping,
+          ...settings.shipping,
           standardRate: settings.shipping.standardRate,
           expressRate: settings.shipping.expressRate ?? 0,
           freeShippingThreshold: settings.shipping.freeShippingThreshold ?? 0,
         },
-      });
+        paymentMethods: {
+          ...prev.paymentMethods,
+          ...(paymentMethodsFromSettings as unknown as Partial<typeof prev.paymentMethods>),
+          razorpay: {
+            ...prev.paymentMethods.razorpay,
+            ...((paymentMethodsFromSettings?.razorpay as Partial<typeof prev.paymentMethods.razorpay>) ?? {}),
+          },
+        },
+      }));
       setTempShippingRate(settings.shipping.standardRate.toString());
       setTempTaxRate(settings.tax.rate.toString());
     }
@@ -102,7 +119,7 @@ const AdminSettings: React.FC = () => {
     }
   };
 
-  const togglePaymentMethod = (method: 'stripe' | 'paypal' | 'applePay' | 'googlePay') => {
+  const togglePaymentMethod = (method: 'stripe' | 'paypal' | 'razorpay' | 'applePay' | 'googlePay') => {
     setLocalSettings({
       ...localSettings,
       paymentMethods: {
@@ -110,6 +127,19 @@ const AdminSettings: React.FC = () => {
         [method]: {
           ...localSettings.paymentMethods[method],
           enabled: !localSettings.paymentMethods[method].enabled,
+        },
+      },
+    });
+  };
+
+  const updateRazorpayConfig = (field: 'keyId' | 'keySecret' | 'webhookSecret', value: string) => {
+    setLocalSettings({
+      ...localSettings,
+      paymentMethods: {
+        ...localSettings.paymentMethods,
+        razorpay: {
+          ...localSettings.paymentMethods.razorpay,
+          [field]: value,
         },
       },
     });
@@ -313,6 +343,7 @@ const AdminSettings: React.FC = () => {
             {[
               { key: 'stripe', label: 'Stripe Checkout' },
               { key: 'paypal', label: 'PayPal Express' },
+              { key: 'razorpay', label: 'Razorpay' },
               { key: 'applePay', label: 'Apple Pay' },
               { key: 'googlePay', label: 'Google Pay' }
             ].map((method) => (
@@ -322,7 +353,7 @@ const AdminSettings: React.FC = () => {
                   <input 
                     type="checkbox"
                     checked={localSettings.paymentMethods[method.key as keyof typeof localSettings.paymentMethods].enabled}
-                    onChange={() => togglePaymentMethod(method.key as 'stripe' | 'paypal' | 'applePay' | 'googlePay')}
+                    onChange={() => togglePaymentMethod(method.key as 'stripe' | 'paypal' | 'razorpay' | 'applePay' | 'googlePay')}
                     className="sr-only peer"
                   />
                   <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-indigo-500 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
@@ -330,6 +361,53 @@ const AdminSettings: React.FC = () => {
               </div>
             ))}
           </div>
+
+          {localSettings.paymentMethods.razorpay.enabled && (
+            <div className="mt-6 p-6 bg-slate-50 rounded-xl border border-slate-200 space-y-4">
+              <h4 className="font-semibold text-slate-900">Razorpay Configuration</h4>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                    Key ID
+                  </label>
+                  <input
+                    type="text"
+                    value={localSettings.paymentMethods.razorpay.keyId || ''}
+                    onChange={(e) => updateRazorpayConfig('keyId', e.target.value)}
+                    placeholder="rzp_test_..."
+                    className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  />
+                  <p className="mt-1 text-xs text-slate-500">Your Razorpay Key ID from the dashboard</p>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                    Key Secret
+                  </label>
+                  <input
+                    type="password"
+                    value={localSettings.paymentMethods.razorpay.keySecret || ''}
+                    onChange={(e) => updateRazorpayConfig('keySecret', e.target.value)}
+                    placeholder="Enter your key secret"
+                    className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  />
+                  <p className="mt-1 text-xs text-slate-500">Your Razorpay Key Secret (keep this secure)</p>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                    Webhook Secret (Optional)
+                  </label>
+                  <input
+                    type="password"
+                    value={localSettings.paymentMethods.razorpay.webhookSecret || ''}
+                    onChange={(e) => updateRazorpayConfig('webhookSecret', e.target.value)}
+                    placeholder="Enter webhook secret"
+                    className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  />
+                  <p className="mt-1 text-xs text-slate-500">Webhook secret for verifying webhook signatures (recommended for production)</p>
+                </div>
+              </div>
+            </div>
+          )}
         </section>
 
         <div className="pt-4 flex justify-end">

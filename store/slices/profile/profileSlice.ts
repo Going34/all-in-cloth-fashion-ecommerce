@@ -43,6 +43,11 @@ const profileSlice = createSlice({
       state.loading = false;
       state.error = action.payload;
     },
+    // Batch update from userData
+    batchUpdateProfile: (state, action: PayloadAction<User>) => {
+      state.data = action.payload;
+      state.error = null;
+    },
   },
 });
 

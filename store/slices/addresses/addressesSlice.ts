@@ -121,6 +121,12 @@ const addressesSlice = createSlice({
       state.loading = false;
       state.error = action.payload;
     },
+    // Batch update from userData
+    batchUpdateAddresses: (state, action: PayloadAction<Address[]>) => {
+      state.data = action.payload;
+      state.defaultAddress = action.payload.find((addr) => addr.is_default) || null;
+      state.error = null;
+    },
   },
 });
 

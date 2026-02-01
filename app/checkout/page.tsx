@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useCart } from '../../context/CartContext';
@@ -9,10 +9,16 @@ import { ordersActions } from '../../store/slices/orders/ordersSlice';
 import { selectOrdersLoading, selectOrdersError, selectSelectedOrder } from '../../store/slices/orders/ordersSelectors';
 import { addressesActions } from '../../store/slices/addresses/addressesSlice';
 import { selectAddresses, selectAddressesLoading, selectAddressesError, selectDefaultAddress } from '../../store/slices/addresses/addressesSelectors';
-import { CheckCircle2, ChevronLeft, CreditCard, Truck, MapPin, Plus } from 'lucide-react';
+import { CheckCircle2, ChevronLeft, CreditCard, Truck, MapPin, Plus, Loader2 } from 'lucide-react';
 import ProtectedRoute from '../../components/ProtectedRoute';
 import { formatCurrency } from '../../utils/currency';
 import type { Address, AddressInput } from '../../types';
+
+declare global {
+  interface Window {
+    Razorpay: any;
+  }
+}
 
 function CheckoutContent() {
   const { cart, totalPrice, clearCart } = useCart();
@@ -40,32 +46,64 @@ function CheckoutContent() {
   });
   const [addressValidationErrors, setAddressValidationErrors] = useState<Record<string, string>>({});
   const [isCreatingAddress, setIsCreatingAddress] = useState(false);
+  const [isProcessingPayment, setIsProcessingPayment] = useState(false);
+  const [paymentError, setPaymentError] = useState<string | null>(null);
+  const [razorpayLoaded, setRazorpayLoaded] = useState(false);
+  const razorpayScriptLoaded = useRef(false);
+  const redirectStarted = useRef(false);
 
   const shipping = 15;
   const tax = totalPrice * 0.08;
   const grandTotal = totalPrice + shipping + tax;
 
   useEffect(() => {
+    if (isSuccess) return;
     dispatch(addressesActions.fetchAddressesRequest());
-  }, [dispatch]);
+  }, [dispatch, isSuccess]);
 
   useEffect(() => {
+    if (isSuccess) return;
     if (defaultAddress && !selectedAddressId && !useNewAddress) {
       setSelectedAddressId(defaultAddress.id);
     } else if (addresses.length > 0 && !selectedAddressId && !useNewAddress && !defaultAddress) {
       setSelectedAddressId(addresses[0].id);
     }
-  }, [defaultAddress, addresses, selectedAddressId, useNewAddress]);
+  }, [defaultAddress, addresses, selectedAddressId, useNewAddress, isSuccess]);
 
   useEffect(() => {
-    if (createdOrder && !loading && !error) {
+    if (isSuccess || redirectStarted.current) return;
+    if (createdOrder && !loading && !error && createdOrder.status === 'paid') {
       setIsSuccess(true);
+      redirectStarted.current = true;
       clearCart();
       setTimeout(() => {
         router.push('/');
       }, 4000);
     }
-  }, [createdOrder, loading, error, clearCart, router]);
+  }, [createdOrder, loading, error, clearCart, router, isSuccess]);
+
+  useEffect(() => {
+    if (razorpayScriptLoaded.current) return;
+
+    const script = document.createElement('script');
+    script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+    script.async = true;
+    script.onload = () => {
+      setRazorpayLoaded(true);
+      razorpayScriptLoaded.current = true;
+    };
+    script.onerror = () => {
+      console.error('Failed to load Razorpay script');
+      setPaymentError('Failed to load payment gateway. Please refresh the page.');
+    };
+    document.body.appendChild(script);
+
+    return () => {
+      if (script.parentNode) {
+        script.parentNode.removeChild(script);
+      }
+    };
+  }, []);
 
   const validateNewAddressForm = (): boolean => {
     const errors: Record<string, string> = {};
@@ -138,7 +176,7 @@ function CheckoutContent() {
     dispatch(addressesActions.createAddressRequest(newAddressForm));
   };
 
-  const handlePlaceOrder = () => {
+  const handlePlaceOrder = async () => {
     let addressIdToUse: string | null = null;
 
     if (useNewAddress) {
@@ -157,16 +195,131 @@ function CheckoutContent() {
       return;
     }
 
-    const orderItems = cart.map(item => ({
-      variant_id: item.variant_id,
-      quantity: item.quantity,
-    }));
+    if (!razorpayLoaded) {
+      setPaymentError('Payment gateway is still loading. Please wait a moment and try again.');
+      return;
+    }
 
-    dispatch(ordersActions.createUserOrderRequest({
-      items: orderItems,
-      address_id: addressIdToUse,
-      shipping: shipping,
-    }));
+    setIsProcessingPayment(true);
+    setPaymentError(null);
+
+    try {
+      const orderItems = cart.map(item => ({
+        variant_id: item.variant_id,
+        quantity: item.quantity,
+      }));
+
+      const orderResponse = await fetch('/api/orders', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          items: orderItems,
+          address_id: addressIdToUse,
+          shipping: shipping,
+        }),
+      });
+
+      if (!orderResponse.ok) {
+        const errorData = await orderResponse.json();
+        throw new Error(errorData.error?.message || 'Failed to create order');
+      }
+
+      const orderData = await orderResponse.json();
+      const order = orderData.data;
+
+      const paymentResponse = await fetch('/api/payments/create', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          order_id: order.id,
+        }),
+      });
+
+      if (!paymentResponse.ok) {
+        const errorData = await paymentResponse.json();
+        throw new Error(errorData.error?.message || 'Failed to initialize payment');
+      }
+
+      const paymentData = await paymentResponse.json();
+      const paymentConfig = paymentData.data;
+
+      const options = {
+        key: paymentConfig.key_id,
+        amount: paymentConfig.amount,
+        currency: paymentConfig.currency,
+        name: paymentConfig.name,
+        description: paymentConfig.description,
+        order_id: paymentConfig.razorpay_order_id,
+        handler: async function (response: any) {
+          try {
+            setIsProcessingPayment(true);
+            setPaymentError(null);
+
+            const verifyResponse = await fetch('/api/payments/verify', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                razorpay_order_id: response.razorpay_order_id,
+                razorpay_payment_id: response.razorpay_payment_id,
+                razorpay_signature: response.razorpay_signature,
+              }),
+            });
+
+            if (!verifyResponse.ok) {
+              const errorData = await verifyResponse.json();
+              throw new Error(errorData.error?.message || 'Payment verification failed');
+            }
+
+            const verifyData = await verifyResponse.json();
+            
+            if (verifyData.data.success) {
+              if (!redirectStarted.current) {
+                redirectStarted.current = true;
+                setIsSuccess(true);
+                clearCart();
+                setTimeout(() => {
+                  router.push('/');
+                }, 3000);
+              }
+            } else {
+              setPaymentError('Payment verification failed. Please contact support.');
+            }
+          } catch (error: any) {
+            console.error('Payment verification error:', error);
+            setPaymentError(error.message || 'Payment verification failed. Please contact support.');
+          } finally {
+            setIsProcessingPayment(false);
+          }
+        },
+        prefill: {
+          name: '',
+          email: '',
+          contact: '',
+        },
+        theme: {
+          color: '#000000',
+        },
+        modal: {
+          ondismiss: function() {
+            setIsProcessingPayment(false);
+            setPaymentError('Payment was cancelled');
+          },
+        },
+      };
+
+      const razorpay = new window.Razorpay(options);
+      razorpay.open();
+    } catch (error: any) {
+      console.error('Order creation error:', error);
+      setPaymentError(error.message || 'Failed to process payment. Please try again.');
+      setIsProcessingPayment(false);
+    }
   };
 
   if (isSuccess) {
@@ -494,32 +647,52 @@ function CheckoutContent() {
               <div className="flex items-center justify-between pb-4 border-b border-neutral-100">
                 <div className="flex items-center space-x-3">
                   <CreditCard size={24} />
-                  <span className="font-medium">Credit / Debit Card</span>
+                  <span className="font-medium">Razorpay Payment</span>
                 </div>
                 <div className="flex space-x-2">
                   <div className="w-8 h-5 bg-neutral-100 border border-neutral-200 rounded text-[6px] flex items-center justify-center">VISA</div>
                   <div className="w-8 h-5 bg-neutral-100 border border-neutral-200 rounded text-[6px] flex items-center justify-center">MASTER</div>
+                  <div className="w-8 h-5 bg-neutral-100 border border-neutral-200 rounded text-[6px] flex items-center justify-center">UPI</div>
                 </div>
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4 pt-4">
-                <input type="text" placeholder="Card Number" className="md:col-span-4 p-3 border border-neutral-200 rounded-md" />
-                <input type="text" placeholder="MM / YY" className="md:col-span-2 p-3 border border-neutral-200 rounded-md" />
-                <input type="text" placeholder="CVC" className="md:col-span-2 p-3 border border-neutral-200 rounded-md" />
+              <div className="pt-4">
+                <p className="text-sm text-neutral-600">
+                  You will be redirected to Razorpay secure payment gateway to complete your payment.
+                  We support Credit/Debit Cards, UPI, Net Banking, and Wallets.
+                </p>
+                {!razorpayLoaded && (
+                  <div className="mt-4 flex items-center space-x-2 text-sm text-neutral-500">
+                    <Loader2 size={16} className="animate-spin" />
+                    <span>Loading payment gateway...</span>
+                  </div>
+                )}
               </div>
             </div>
           </div>
 
-          {error && (
+          {(error || paymentError) && (
             <div className="p-4 bg-red-50 border border-red-200 rounded-md text-red-700 text-sm">
-              Error placing order: {error}
+              {error || paymentError}
             </div>
           )}
           <button 
             onClick={handlePlaceOrder}
-            disabled={loading}
-            className="w-full py-5 bg-neutral-900 text-white font-bold uppercase tracking-widest hover:bg-neutral-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            disabled={loading || isProcessingPayment || !razorpayLoaded}
+            className="w-full py-5 bg-neutral-900 text-white font-bold uppercase tracking-widest hover:bg-neutral-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
           >
-            {loading ? 'Processing...' : `Place Order — ${formatCurrency(grandTotal)}`}
+            {isProcessingPayment ? (
+              <>
+                <Loader2 size={20} className="animate-spin" />
+                <span>Processing Payment...</span>
+              </>
+            ) : loading ? (
+              <>
+                <Loader2 size={20} className="animate-spin" />
+                <span>Creating Order...</span>
+              </>
+            ) : (
+              `Pay ${formatCurrency(grandTotal)}`
+            )}
           </button>
         </div>
 
@@ -586,4 +759,5 @@ export default function Checkout() {
     </ProtectedRoute>
   );
 }
+
 

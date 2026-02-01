@@ -32,6 +32,8 @@ export interface ProductsState {
   filters: ProductFilters;
   pagination: PaginationState;
   selectedProduct: Product | null;
+  productsCache: Record<string, Product>; // Cache products by ID for quick lookup
+  productsLoaded: boolean; // Flag to track if products have been initially loaded
 }
 
 const initialState: ProductsState = {
@@ -49,6 +51,8 @@ const initialState: ProductsState = {
     totalPages: 0,
   },
   selectedProduct: null,
+  productsCache: {}, // Initialize empty cache
+  productsLoaded: false, // Track if products have been loaded
 };
 
 const productsSlice = createSlice({
@@ -67,6 +71,10 @@ const productsSlice = createSlice({
       state.data = action.payload.products;
       state.pagination = action.payload.pagination;
       state.error = null;
+      // Update cache with fetched products
+      action.payload.products.forEach((product) => {
+        state.productsCache[product.id] = product;
+      });
     },
     fetchProductsDataFailure: (state, action: PayloadAction<string>) => {
       state.loading = false;
@@ -80,6 +88,8 @@ const productsSlice = createSlice({
       state.loading = false;
       state.selectedProduct = action.payload;
       state.error = null;
+      // Update cache with fetched product
+      state.productsCache[action.payload.id] = action.payload;
     },
     fetchProductByIdFailure: (state, action: PayloadAction<string>) => {
       state.loading = false;
@@ -93,6 +103,8 @@ const productsSlice = createSlice({
       state.loading = false;
       state.data = [action.payload, ...state.data];
       state.error = null;
+      // Update cache with new product
+      state.productsCache[action.payload.id] = action.payload;
     },
     createProductFailure: (state, action: PayloadAction<string>) => {
       state.loading = false;
@@ -109,6 +121,8 @@ const productsSlice = createSlice({
         state.selectedProduct = action.payload;
       }
       state.error = null;
+      // Update cache with updated product
+      state.productsCache[action.payload.id] = action.payload;
     },
     updateProductFailure: (state, action: PayloadAction<string>) => {
       state.loading = false;
@@ -125,19 +139,29 @@ const productsSlice = createSlice({
         state.selectedProduct = null;
       }
       state.error = null;
+      // Remove product from cache
+      delete state.productsCache[action.payload];
     },
     deleteProductFailure: (state, action: PayloadAction<string>) => {
       state.loading = false;
       state.error = action.payload;
     },
     fetchUserProductsRequest: (state, action: PayloadAction<UserProductFilters | undefined>) => {
-      state.loading = true;
+      // Only set loading to true if products haven't been loaded yet
+      if (!state.productsLoaded) {
+        state.loading = true;
+      }
       state.error = null;
     },
     fetchUserProductsSuccess: (state, action: PayloadAction<{ products: Product[]; meta?: any }>) => {
       state.loading = false;
       state.data = action.payload.products;
       state.error = null;
+      state.productsLoaded = true; // Mark products as loaded
+      // Update cache with fetched products
+      action.payload.products.forEach((product) => {
+        state.productsCache[product.id] = product;
+      });
     },
     fetchUserProductsFailure: (state, action: PayloadAction<string>) => {
       state.loading = false;
@@ -151,6 +175,8 @@ const productsSlice = createSlice({
       state.loading = false;
       state.selectedProduct = action.payload;
       state.error = null;
+      // Update cache with fetched product
+      state.productsCache[action.payload.id] = action.payload;
     },
     fetchUserProductByIdFailure: (state, action: PayloadAction<string>) => {
       state.loading = false;

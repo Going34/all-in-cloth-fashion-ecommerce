@@ -12,6 +12,7 @@ import { cartSaga } from './slices/cart/cartSaga';
 import { wishlistSaga } from './slices/wishlist/wishlistSaga';
 import { addressesSaga } from './slices/addresses/addressesSaga';
 import { profileSaga } from './slices/profile/profileSaga';
+import { userDataSaga } from './slices/userData/userDataSaga';
 
 export default function* rootSaga() {
   yield all([
@@ -28,6 +29,7 @@ export default function* rootSaga() {
     wishlistSaga(),
     addressesSaga(),
     profileSaga(),
+    userDataSaga(),
   ]);
 }
 

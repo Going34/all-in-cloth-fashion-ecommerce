@@ -66,7 +66,7 @@ export default function StorefrontLayout({ children }: { children: React.ReactNo
         </div>
       </footer>
       <CartDrawer isOpen={isCartOpen} onClose={() => setIsCartOpen(false)} />
-      <AIStylist />
+      {/* <AIStylist /> */}
     </div>
   );
 }

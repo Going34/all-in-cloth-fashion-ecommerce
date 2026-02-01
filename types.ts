@@ -27,12 +27,13 @@ export type AdminRole = "Admin" | "Ops" | "Support";
 
 export interface User {
   id: string;
-  email: string;
+  email: string | null;
   name?: string | null;
   phone?: string | null;
   is_phone_verified?: boolean;
   is_email_verified?: boolean;
   is_active?: boolean;
+  password_hash?: string | null;
   created_at?: string;
   updated_at?: string;
 }

@@ -20,6 +20,11 @@ Create `.env.local`:
 NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
 SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
+MSG91_AUTH_KEY=your-msg91-auth-key
+AUTH_JWT_SECRET=your-long-random-secret
+
+# Optional (recommended for admin access via phone)
+ADMIN_PHONE=+919999999999
 ```
 
 ---
@@ -42,9 +47,12 @@ npm run migrate:combine
 npm run create:admin
 ```
 
-**Default credentials:**
+**Default credentials (created in Supabase Auth):**
 - Email: `admin@allincloth.com`
 - Password: `Admin@123`
+
+**Admin portal login (after setting `ADMIN_PHONE`):**
+- Enter the admin phone number on `/admin/login` (OTP is skipped if `is_phone_verified` is true)
 
 ---
 

@@ -3,6 +3,7 @@ import { successResponse, errorResponse } from '@/lib/response';
 import { requireAuth } from '@/lib/auth';
 import { createOrder, listOrders } from '@/modules/order/order.service';
 import { validateCreateOrderRequest } from '@/modules/order/order.validators';
+import { generateIdempotencyKey } from '@/lib/idempotency';
 import type { OrderStatus } from '@/types';
 
 export async function GET(request: NextRequest) {
@@ -34,7 +35,12 @@ export async function POST(request: NextRequest) {
 
     const shippingAmount = typeof body.shipping === 'number' ? body.shipping : 0;
 
-    const order = await createOrder(user.id, orderData, shippingAmount);
+    const idempotencyKey =
+      (typeof body.idempotency_key === 'string' && body.idempotency_key.length > 0
+        ? body.idempotency_key
+        : request.headers.get('idempotency-key')) || generateIdempotencyKey(user.id, orderData);
+
+    const order = await createOrder(user.id, orderData, shippingAmount, idempotencyKey);
 
     return successResponse(order, 201);
   } catch (error) {

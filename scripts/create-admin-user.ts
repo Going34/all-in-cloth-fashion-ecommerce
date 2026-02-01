@@ -18,11 +18,12 @@
 
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = 'https://zagoyabmutueuzzndkmb.supabase.co';
-const supabaseServiceKey = 'sb_secret_E29qz5SdYf_yViv_cCb0mg_tA9g11zO'
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const adminEmail = process.env.ADMIN_EMAIL || 'admin@allincloth.com';
 const adminPassword = process.env.ADMIN_PASSWORD || 'Admin@123';
 const adminName = process.env.ADMIN_NAME || 'Admin User';
+const adminPhone = process.env.ADMIN_PHONE || '';
 
 if (!supabaseUrl) {
   console.error('❌ NEXT_PUBLIC_SUPABASE_URL is not set');
@@ -166,6 +167,8 @@ async function createAdminUser() {
           id: userId,
           email: adminEmail,
           name: adminName,
+          phone: adminPhone || null,
+          is_phone_verified: Boolean(adminPhone),
           is_email_verified: true,
           is_active: true,
         } as any);
@@ -181,6 +184,7 @@ async function createAdminUser() {
         .from('users')
         .update({
           name: adminName,
+          ...(adminPhone ? { phone: adminPhone, is_phone_verified: true } : {}),
           is_email_verified: true,
           is_active: true,
         } as any)

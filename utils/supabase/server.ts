@@ -10,8 +10,23 @@ const supabaseAnonKey =
 export const createClient = async () => {
   const cookieStore = await cookies();
 
+  // Validate environment variables in production
   if (!supabaseUrl || !supabaseAnonKey) {
+    const errorMsg = 'Supabase URL or key not configured. Please set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY environment variables.';
+    console.error(errorMsg);
+    if (process.env.NODE_ENV === 'production') {
+      throw new Error(errorMsg);
+    }
     console.warn('Supabase URL or key not configured. Database features will not work.');
+  }
+
+  // Validate URL format
+  if (supabaseUrl && !supabaseUrl.startsWith('http')) {
+    const errorMsg = `Invalid Supabase URL format: ${supabaseUrl}. URL must start with http:// or https://`;
+    console.error(errorMsg);
+    if (process.env.NODE_ENV === 'production') {
+      throw new Error(errorMsg);
+    }
   }
 
   return createServerClient(

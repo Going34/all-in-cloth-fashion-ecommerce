@@ -1,18 +1,21 @@
-import { getDbClient } from '@/lib/db';
+import { getAdminDbClient } from '@/lib/adminDb';
 import { NotFoundError, ConflictError } from '@/lib/errors';
-import type { Order, OrderItem, OrderStatus, OrderStatusHistory } from '@/types';
-import type { CreateOrderRequest, OrderResponse } from './order.types';
+import type { OrderItem, OrderStatus, OrderStatusHistory, Payment } from '@/types';
+import type { AdminOrderListItem, CreateOrderRequest, OrderResponse } from './order.types';
+
+type Row = Record<string, unknown>;
 
 export async function findOrderById(id: string): Promise<OrderResponse | null> {
-  const supabase = await getDbClient();
+  const db = getAdminDbClient();
 
-  const { data, error } = await supabase
+  const { data, error } = await db
     .from('orders')
     .select(
       `
       *,
       order_items (*),
-      order_status_history (*)
+      order_status_history (*),
+      payments (*)
     `
     )
     .eq('id', id)
@@ -22,130 +25,65 @@ export async function findOrderById(id: string): Promise<OrderResponse | null> {
     return null;
   }
 
-  const order = data as any;
+  const order = data as unknown as OrderResponse & {
+    order_items?: OrderItem[];
+    order_status_history?: OrderStatusHistory[];
+    payments?: Payment[];
+  };
+
   return {
     ...order,
     items: order.order_items || [],
     status_history: order.order_status_history || [],
+    payment: order.payments && order.payments.length > 0 ? order.payments[0] : null,
   };
 }
 
 export async function createOrder(
   userId: string,
   orderData: CreateOrderRequest,
-  shippingAmount: number = 0
+  shippingAmount: number = 0,
+  idempotencyKey?: string
 ): Promise<OrderResponse> {
-  const supabase = await getDbClient();
+  const db = getAdminDbClient();
 
-  const variantIds = orderData.items.map((i) => i.variant_id);
-  const { data: variants, error: variantsError } = await supabase
-    .from('product_variants')
-    .select(
-      `
-      id,
-      sku,
-      price_override,
-      products (id, name, base_price)
-    `
-    )
-    .in('id', variantIds);
-
-  if (variantsError || !variants || variants.length === 0) {
-    throw new NotFoundError('Product variants');
-  }
-
-  for (const item of orderData.items) {
-    const { data: inventory, error: inventoryError } = await supabase
-      .from('inventory')
-      .select('stock, reserved_stock')
-      .eq('variant_id', item.variant_id)
-      .single();
-
-    if (inventoryError || !inventory) {
-      const variant = (variants as any[]).find((v) => v.id === item.variant_id);
-      throw new NotFoundError('Inventory', variant?.sku || item.variant_id);
-    }
-
-    const inv = inventory as { stock: number; reserved_stock: number };
-    const availableStock = inv.stock - (inv.reserved_stock || 0);
-
-    if (availableStock < item.quantity) {
-      const variant = (variants as any[]).find((v) => v.id === item.variant_id);
-      throw new ConflictError(
-        `Insufficient stock for variant ${variant?.sku || item.variant_id}. Available: ${availableStock}, Requested: ${item.quantity}`
-      );
-    }
-  }
-
-  let subtotal = 0;
-  const orderItems = orderData.items.map((item) => {
-    const variant = (variants as any[]).find((v) => v.id === item.variant_id);
-    const product = variant?.products as { base_price: number; name: string } | null;
-    const price = variant?.price_override ?? product?.base_price ?? 0;
-    subtotal += price * item.quantity;
-
-    return {
-      variant_id: variant?.id || null,
-      quantity: item.quantity,
-      product_name_snapshot: product?.name || 'Unknown Product',
-      sku_snapshot: variant?.sku || '',
-      price_snapshot: price,
-    };
+  const { data: result, error: rpcError } = await db.rpc('create_order_transactional', {
+    p_user_id: userId,
+    p_order_items: orderData.items,
+    p_address_id: orderData.address_id,
+    p_shipping_amount: shippingAmount,
+    p_order_idempotency_key: idempotencyKey || null,
   });
 
-  const tax = subtotal * 0.1;
-  const total = subtotal + tax + shippingAmount;
-
-  const orderNumber = `ORD-${Date.now()}-${Math.random().toString(36).substring(2, 9).toUpperCase()}`;
-
-  const { data: order, error: orderError } = await supabase
-    .from('orders')
-    .insert({
-      order_number: orderNumber,
-      user_id: userId,
-      status: 'pending',
-      subtotal,
-      tax,
-      shipping: shippingAmount,
-      total,
-    })
-    .select()
-    .single();
-
-  if (orderError || !order) {
-    throw new Error(`Failed to create order: ${orderError?.message || 'Unknown error'}`);
-  }
-
-  const orderId = (order as Order).id;
-
-  const { error: itemsError } = await supabase
-    .from('order_items')
-    .insert(orderItems.map((item) => ({ ...item, order_id: orderId })));
-
-  if (itemsError) {
-    throw new Error(`Failed to create order items: ${itemsError.message}`);
-  }
-
-  const { error: statusError } = await supabase
-    .from('order_status_history')
-    .insert({ order_id: orderId, status: 'pending' });
-
-  if (statusError) {
-    throw new Error(`Failed to create status history: ${statusError.message}`);
-  }
-
-  for (const item of orderData.items) {
-    const { error: reserveError } = await supabase.rpc('reserve_inventory', {
-      p_variant_id: item.variant_id,
-      p_quantity: item.quantity,
-    });
-
-    if (reserveError) {
-      throw new Error(`Failed to reserve inventory: ${reserveError.message}`);
+  if (rpcError) {
+    const errorMessage = rpcError.message || 'Unknown error';
+    
+    if (errorMessage.includes('Insufficient stock')) {
+      throw new ConflictError(errorMessage);
     }
+    if (errorMessage.includes('not found')) {
+      throw new NotFoundError(errorMessage);
+    }
+    
+    throw new Error(`Failed to create order: ${errorMessage}`);
   }
 
-  const createdOrder = await findOrderById(orderId);
+  const orderResult = result as {
+    success: boolean;
+    order_id: string;
+    order_number: string;
+    duplicate?: boolean;
+  };
+
+  if (orderResult.duplicate) {
+    const existingOrder = await findOrderById(orderResult.order_id);
+    if (!existingOrder) {
+      throw new Error('Duplicate order found but could not be retrieved');
+    }
+    return existingOrder;
+  }
+
+  const createdOrder = await findOrderById(orderResult.order_id);
   if (!createdOrder) {
     throw new Error('Failed to retrieve created order');
   }
@@ -162,15 +100,15 @@ export async function findOrdersAdmin(filters: {
   dateTo?: string;
   sort?: 'created_at:asc' | 'created_at:desc' | 'total:asc' | 'total:desc';
 }): Promise<{
-  orders: any[];
+  orders: AdminOrderListItem[];
   total: number;
 }> {
-  const supabase = await getDbClient();
+  const db = getAdminDbClient();
   const page = filters.page || 1;
   const limit = filters.limit || 20;
   const offset = (page - 1) * limit;
 
-  let query = supabase
+  let query = db
     .from('orders')
     .select(
       `
@@ -211,26 +149,31 @@ export async function findOrdersAdmin(filters: {
     throw new Error(`Failed to fetch orders: ${error.message}`);
   }
 
-  const orders = ((data as any[]) || []).map((order) => {
-    const user = order.users || {};
-    const itemCount = (order.order_items || []).reduce((sum: number, item: any) => sum + (item.quantity || 0), 0);
+  const rows = (data ?? []) as unknown[];
+  const orders: AdminOrderListItem[] = rows.map((r) => {
+    const row = r as Row;
+    const user = (row.users ?? {}) as Row;
+    const orderItems = (Array.isArray(row.order_items) ? (row.order_items as unknown[]) : []).map(
+      (i) => i as Row
+    );
+    const itemCount = orderItems.reduce((sum, item) => sum + Number(item.quantity ?? 0), 0);
 
     return {
-      id: order.id,
-      order_number: order.order_number,
+      id: String(row.id ?? ''),
+      order_number: String(row.order_number ?? ''),
       customer: {
-        id: user.id || '',
-        name: user.name || '',
-        email: user.email || '',
+        id: String(user.id ?? ''),
+        name: String(user.name ?? ''),
+        email: String(user.email ?? ''),
       },
-      status: order.status,
-      total: order.total,
-      subtotal: order.subtotal,
-      tax: order.tax,
-      shipping: order.shipping,
+      status: row.status as OrderStatus,
+      total: Number(row.total ?? 0),
+      subtotal: Number(row.subtotal ?? 0),
+      tax: Number(row.tax ?? 0),
+      shipping: Number(row.shipping ?? 0),
       itemCount,
-      created_at: order.created_at,
-      updated_at: order.updated_at,
+      created_at: String(row.created_at ?? ''),
+      updated_at: String(row.updated_at ?? ''),
     };
   });
 
@@ -247,15 +190,16 @@ export async function findOrdersByUserId(
     limit?: number;
   }
 ): Promise<OrderResponse[]> {
-  const supabase = await getDbClient();
+  const db = getAdminDbClient();
 
-  let query = supabase
+  let query = db
     .from('orders')
     .select(
       `
       *,
       order_items (*),
-      order_status_history (*)
+      order_status_history (*),
+      payments (*)
     `
     )
     .eq('user_id', userId)
@@ -275,17 +219,26 @@ export async function findOrdersByUserId(
     throw new Error(`Failed to fetch orders: ${error.message}`);
   }
 
-  return ((data as any[]) || []).map((order) => ({
-    ...order,
-    items: order.order_items || [],
-    status_history: order.order_status_history || [],
-  }));
+  const rows = (data ?? []) as unknown[];
+  return rows.map((r) => {
+    const row = r as unknown as OrderResponse & {
+      order_items?: OrderItem[];
+      order_status_history?: OrderStatusHistory[];
+      payments?: Payment[];
+    };
+    return {
+      ...row,
+      items: row.order_items || [],
+      status_history: row.order_status_history || [],
+      payment: row.payments && row.payments.length > 0 ? row.payments[0] : null,
+    };
+  });
 }
 
-export async function findOrderByIdAdmin(id: string): Promise<any | null> {
-  const supabase = await getDbClient();
+export async function findOrderByIdAdmin(id: string): Promise<unknown | null> {
+  const db = getAdminDbClient();
 
-  const { data, error } = await supabase
+  const { data, error } = await db
     .from('orders')
     .select(
       `
@@ -304,72 +257,80 @@ export async function findOrderByIdAdmin(id: string): Promise<any | null> {
     return null;
   }
 
-  const order = data as any;
-  const user = order.users || {};
-  const address = order.addresses || {};
-  const payment = (order.payments || [])[0] || null;
+  const order = data as Row;
+  const user = (order.users ?? {}) as Row;
+  const address = (order.addresses ?? {}) as Row;
+  const payments = Array.isArray(order.payments) ? (order.payments as unknown[]).map((p) => p as Row) : [];
+  const payment = payments[0] ?? null;
+  const orderStatusHistory = Array.isArray(order.order_status_history)
+    ? (order.order_status_history as unknown[]).map((h) => h as Row)
+    : [];
+  const orderItems = Array.isArray(order.order_items)
+    ? (order.order_items as unknown[]).map((i) => i as Row)
+    : [];
 
   return {
-    id: order.id,
-    orderNumber: order.order_number,
+    id: String(order.id ?? ''),
+    orderNumber: String(order.order_number ?? ''),
     customer: {
-      id: user.id || '',
-      name: user.name || '',
-      email: user.email || '',
-      phone: user.phone || null,
+      id: String(user.id ?? ''),
+      name: String(user.name ?? ''),
+      email: String(user.email ?? ''),
+      phone: (user.phone as string | null | undefined) ?? null,
     },
     shippingAddress: address.id
       ? {
-          name: address.name || '',
-          street: address.street || '',
-          city: address.city || '',
-          state: address.state || '',
-          zip: address.zip || '',
-          country: address.country || '',
+          name: String(address.name ?? ''),
+          street: String(address.street ?? ''),
+          city: String(address.city ?? ''),
+          state: String(address.state ?? ''),
+          zip: String(address.zip ?? ''),
+          country: String(address.country ?? ''),
         }
       : null,
-    status: order.status,
-    statusHistory: (order.order_status_history || []).map((h: any) => ({
-      status: h.status,
-      changedAt: h.changed_at || h.created_at,
+    status: order.status as OrderStatus,
+    statusHistory: orderStatusHistory.map((h) => ({
+      status: h.status as OrderStatus,
+      changedAt: String((h.changed_at ?? h.created_at) ?? ''),
     })),
-    items: (order.order_items || []).map((item: any) => ({
-      id: item.id,
-      productName: item.product_name_snapshot,
-      sku: item.sku_snapshot,
-      price: item.price_snapshot,
-      quantity: item.quantity,
-      variantId: item.variant_id,
+    items: orderItems.map((item) => ({
+      id: String(item.id ?? ''),
+      productName: String(item.product_name_snapshot ?? ''),
+      sku: String(item.sku_snapshot ?? ''),
+      price: Number(item.price_snapshot ?? 0),
+      quantity: Number(item.quantity ?? 0),
+      variantId: String(item.variant_id ?? ''),
     })),
     payment: payment
       ? {
-          method: payment.method,
-          status: payment.status,
-          amount: payment.amount,
-          transactionId: payment.id,
+          method: String(payment.method ?? ''),
+          status: String(payment.status ?? ''),
+          amount: Number(payment.amount ?? 0),
+          transactionId: String(payment.id ?? ''),
         }
       : null,
     shipping: {
       method: 'standard',
-      rate: order.shipping,
+      rate: Number(order.shipping ?? 0),
       trackingNumber: null,
     },
-    subtotal: order.subtotal,
-    tax: order.tax,
-    total: order.total,
-    createdAt: order.created_at,
-    updatedAt: order.updated_at,
+    subtotal: Number(order.subtotal ?? 0),
+    tax: Number(order.tax ?? 0),
+    total: Number(order.total ?? 0),
+    createdAt: String(order.created_at ?? ''),
+    updatedAt: String(order.updated_at ?? ''),
   };
 }
 
 export async function updateOrderStatusAdmin(
   id: string,
   status: OrderStatus,
-  notes?: string
-): Promise<any> {
-  const supabase = await getDbClient();
+  _notes?: string
+): Promise<unknown> {
+  const db = getAdminDbClient();
+  void _notes;
 
-  const { data: existingOrder } = await supabase
+  const { data: existingOrder } = await db
     .from('orders')
     .select('status')
     .eq('id', id)
@@ -379,7 +340,7 @@ export async function updateOrderStatusAdmin(
     throw new Error('Order not found');
   }
 
-  const { error: updateError } = await supabase
+  const { error: updateError } = await db
     .from('orders')
     .update({ status })
     .eq('id', id);
@@ -388,7 +349,7 @@ export async function updateOrderStatusAdmin(
     throw new Error(`Failed to update order status: ${updateError.message}`);
   }
 
-  const { error: historyError } = await supabase
+  const { error: historyError } = await db
     .from('order_status_history')
     .insert({
       order_id: id,

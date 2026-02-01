@@ -1,9 +1,10 @@
-import { call, put, takeEvery, takeLatest } from 'redux-saga/effects';
+import { call, put, select, takeEvery, takeLatest } from 'redux-saga/effects';
 import { apiClient } from '../../api/client';
 import { apiInterceptor } from '../../api/interceptor';
 import { productsActions } from './productsSlice';
-import type { ProductFilters, UserProductFilters } from './productsSlice';
+import type { ProductFilters, UserProductFilters, ProductsState } from './productsSlice';
 import type { Product } from '@/types';
+import type { RootState } from '../../types';
 
 // Helper function to transform API response product from camelCase to snake_case
 // Handles both camelCase (from list API) and snake_case (from get by id API) formats
@@ -64,8 +65,21 @@ function* fetchProductsSaga(action: ReturnType<typeof productsActions.fetchProdu
 
 function* fetchProductByIdSaga(action: ReturnType<typeof productsActions.fetchProductByIdRequest>): Generator<any, void, unknown> {
   try {
+    const productId = action.payload;
+    
+    // Check if product exists in cache
+    const productsState = (yield select((state: RootState) => state.products)) as ProductsState;
+    const cachedProduct = productsState.productsCache[productId];
+    
+    if (cachedProduct) {
+      // Product found in cache, use it instead of making API call
+      yield put(productsActions.fetchProductByIdSuccess(cachedProduct));
+      return;
+    }
+    
+    // Product not in cache, fetch from API
     const config = {
-      url: `/admin/products/${action.payload}`,
+      url: `/admin/products/${productId}`,
       method: 'GET' as const,
     };
 
@@ -148,7 +162,37 @@ function* deleteProductSaga(action: ReturnType<typeof productsActions.deleteProd
 
 function* fetchUserProductsSaga(action: ReturnType<typeof productsActions.fetchUserProductsRequest>): Generator<any, void, unknown> {
   try {
+    // Check if products are already loaded in Redux
+    const productsState = (yield select((state: RootState) => state.products)) as ProductsState;
     const filters = action.payload || {};
+    
+    // If products are already loaded and we're just filtering (not fetching new data), skip API call
+    if (productsState.productsLoaded && Object.keys(productsState.productsCache).length > 0) {
+      // Products already in cache, filter from cache instead of making API call
+      const cachedProducts = Object.values(productsState.productsCache) as Product[];
+      let filteredProducts = cachedProducts;
+      
+      // Apply filters to cached products
+      if (filters.status) {
+        filteredProducts = filteredProducts.filter((p: Product) => p.status === filters.status);
+      }
+      if (filters.categoryId) {
+        filteredProducts = filteredProducts.filter((p: Product) => 
+          p.categories?.some((c: { id: string }) => c.id === filters.categoryId)
+        );
+      }
+      if (filters.featured !== undefined) {
+        filteredProducts = filteredProducts.filter((p: Product) => p.featured === filters.featured);
+      }
+      
+      // Return filtered products from cache without making API call
+      yield put(productsActions.fetchUserProductsSuccess({
+        products: filteredProducts,
+      }));
+      return;
+    }
+    
+    // Products not loaded yet, fetch from API
     const params: Record<string, any> = {};
     
     if (filters.cursor) params.cursor = filters.cursor;
@@ -182,8 +226,21 @@ function* fetchUserProductsSaga(action: ReturnType<typeof productsActions.fetchU
 
 function* fetchUserProductByIdSaga(action: ReturnType<typeof productsActions.fetchUserProductByIdRequest>): Generator<any, void, unknown> {
   try {
+    const productId = action.payload;
+    
+    // Check if product exists in cache
+    const productsState = (yield select((state: RootState) => state.products)) as ProductsState;
+    const cachedProduct = productsState.productsCache[productId];
+    
+    if (cachedProduct) {
+      // Product found in cache, use it instead of making API call
+      yield put(productsActions.fetchUserProductByIdSuccess(cachedProduct));
+      return;
+    }
+    
+    // Product not in cache, fetch from API
     const config = {
-      url: `/products/${action.payload}`,
+      url: `/products/${productId}`,
       method: 'GET' as const,
     };
 

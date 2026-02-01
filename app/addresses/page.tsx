@@ -5,6 +5,8 @@ import { Plus, MapPin, Trash2, Edit2, CheckCircle2, X } from 'lucide-react';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import { addressesActions } from '../../store/slices/addresses/addressesSlice';
 import { selectAddresses, selectAddressesLoading, selectAddressesError } from '../../store/slices/addresses/addressesSelectors';
+import { userDataActions } from '../../store/slices/userData/userDataSlice';
+import { selectUserDataLoaded } from '../../store/slices/userData/userDataSelectors';
 import type { Address, AddressInput } from '../../types';
 import ProtectedRoute from '../../components/ProtectedRoute';
 import AccountLayout from '../../components/AccountLayout';
@@ -14,6 +16,7 @@ function AddressesContent() {
   const addresses = useAppSelector(selectAddresses);
   const loading = useAppSelector(selectAddressesLoading);
   const error = useAppSelector(selectAddressesError);
+  const userDataLoaded = useAppSelector(selectUserDataLoaded);
   const [isAdding, setIsAdding] = useState(false);
   const [editingAddress, setEditingAddress] = useState<Address | null>(null);
   const [formData, setFormData] = useState<AddressInput>({
@@ -28,8 +31,11 @@ function AddressesContent() {
   });
 
   useEffect(() => {
-    dispatch(addressesActions.fetchAddressesRequest());
-  }, [dispatch]);
+    // Only fetch if userData hasn't been loaded yet (cache check)
+    if (!userDataLoaded) {
+      dispatch(userDataActions.fetchUserDataRequest());
+    }
+  }, [dispatch, userDataLoaded]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();

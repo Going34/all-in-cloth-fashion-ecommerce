@@ -1,10 +1,12 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { User, ChevronRight, X, Mail, Phone } from 'lucide-react';
+import { User, ChevronRight, X, Phone } from 'lucide-react';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import { profileActions } from '../../store/slices/profile/profileSlice';
 import { selectProfile, selectProfileLoading, selectProfileError } from '../../store/slices/profile/profileSelectors';
+import { userDataActions } from '../../store/slices/userData/userDataSlice';
+import { selectUserDataLoaded } from '../../store/slices/userData/userDataSelectors';
 import { useAuth } from '../../context/AuthContext';
 import ProtectedRoute from '../../components/ProtectedRoute';
 import AccountLayout from '../../components/AccountLayout';
@@ -14,6 +16,7 @@ function SettingsContent() {
   const profile = useAppSelector(selectProfile);
   const loading = useAppSelector(selectProfileLoading);
   const error = useAppSelector(selectProfileError);
+  const userDataLoaded = useAppSelector(selectUserDataLoaded);
   const { user } = useAuth();
   const [isEditingProfile, setIsEditingProfile] = useState(false);
   const [profileFormData, setProfileFormData] = useState({
@@ -22,8 +25,11 @@ function SettingsContent() {
   });
 
   useEffect(() => {
-    dispatch(profileActions.fetchProfileRequest());
-  }, [dispatch]);
+    // Only fetch if userData hasn't been loaded yet (cache check)
+    if (!userDataLoaded) {
+      dispatch(userDataActions.fetchUserDataRequest());
+    }
+  }, [dispatch, userDataLoaded]);
 
   useEffect(() => {
     if (profile) {
@@ -67,17 +73,6 @@ function SettingsContent() {
               <ChevronRight size={16} className="text-neutral-300" />
             </button>
             <div className="w-full p-4 flex flex-col space-y-3">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-3">
-                  <Mail size={16} className="text-neutral-400" />
-                  <span className="text-sm font-medium">Email Verification</span>
-                </div>
-                {profile?.is_email_verified ? (
-                  <span className="text-xs bg-green-50 text-green-700 px-2 py-0.5 rounded-full font-bold uppercase tracking-widest">Verified</span>
-                ) : (
-                  <span className="text-xs bg-neutral-100 text-neutral-600 px-2 py-0.5 rounded-full font-bold uppercase tracking-widest">Not Verified</span>
-                )}
-              </div>
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-3">
                   <Phone size={16} className="text-neutral-400" />

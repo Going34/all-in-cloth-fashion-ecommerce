@@ -19,7 +19,7 @@ const Navbar: React.FC<NavbarProps> = ({ onOpenCart }) => {
 
   const navLinks = [
     { name: 'Shop', path: '/shop' },
-    { name: 'Collections', path: '/collections' },
+    // { name: 'Collections', path: '/collections' },
     { name: 'Sustainability', path: '/about' },
   ];
 

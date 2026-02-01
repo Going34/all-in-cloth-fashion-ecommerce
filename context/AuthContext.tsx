@@ -1,23 +1,48 @@
 'use client';
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { createClient } from '@/utils/supabase/client';
-import type { User as SupabaseUser, Session } from '@supabase/supabase-js';
-import type { User, Role, RoleType } from '@/types';
+import type { User, Role } from '@/types';
 
 interface AuthUser extends User {
   roles: Role[];
 }
 
+interface SendOtpResult {
+  error: Error | null;
+  otpRequired?: boolean;
+  loggedIn?: boolean;
+  reqId?: string; // Optional - only for MSG91 Widget API, not needed for custom OTP
+}
+
+interface SignupResult {
+  error: Error | null;
+  otpRequired?: boolean;
+}
+
+interface SignupVerifyOtpResult {
+  error: Error | null;
+}
+
+interface LoginResult {
+  error: Error | null;
+}
+
 interface AuthContextType {
   user: AuthUser | null;
-  session: Session | null;
   isAuthenticated: boolean;
   isAdmin: boolean;
   isLoading: boolean;
-  login: (email: string, password: string) => Promise<{ error: Error | null }>;
-  signup: (email: string, password: string) => Promise<{ error: Error | null }>;
-  loginWithGoogle: () => Promise<{ error: Error | null }>;
+  login: (identifier: string, password: string, countryCode?: string) => Promise<LoginResult>;
+  signup: (email: string, name: string, phone: string, countryCode: string, password: string, confirmPassword: string) => Promise<SignupResult>;
+  signupVerifyOtp: (email: string, phone: string, countryCode: string, otp: string) => Promise<SignupVerifyOtpResult>;
+  sendOtp: (phone: string, countryCode?: string) => Promise<SendOtpResult>;
+  verifyOtp: (params: {
+    phone: string;
+    countryCode?: string;
+    otp: string;
+    name?: string;
+    reqId?: string; // Optional - only for MSG91 Widget API, not needed for custom OTP
+  }) => Promise<{ error: Error | null }>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
 }
@@ -26,80 +51,32 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<AuthUser | null>(null);
-  const [session, setSession] = useState<Session | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const supabase = createClient();
-
-  const fetchUserProfile = async (authUser: SupabaseUser): Promise<AuthUser | null> => {
-    try {
-      // Fetch user profile
-      const { data: profile, error: profileError } = await supabase
-        .from('users')
-        .select('*')
-        .eq('id', authUser.id)
-        .single();
-
-      if (profileError) {
-        console.error('Error fetching user profile:', profileError);
-        return null;
-      }
-
-      // Fetch user roles
-      const { data: userRoles, error: rolesError } = await supabase
-        .from('user_roles')
-        .select(`
-          role_id,
-          roles (
-            id,
-            name
-          )
-        `)
-        .eq('user_id', authUser.id);
-
-      if (rolesError) {
-        console.error('Error fetching user roles:', rolesError);
-      }
-
-      const roles: Role[] = userRoles?.flatMap((ur: any) => ur.roles || []).filter((r: any): r is Role => r !== null && r.id && r.name) || [];
-
-      return {
-        ...profile as User,
-        roles,
-      };
-    } catch (error) {
-      console.error('Error in fetchUserProfile:', error);
-      return null;
-    }
-  };
 
   const refreshUser = async () => {
-    const { data: { user: authUser } } = await supabase.auth.getUser();
-    if (authUser) {
-      const profile = await fetchUserProfile(authUser);
-      setUser(profile);
+    try {
+      const res = await fetch('/api/auth/me', { method: 'GET' });
+      const json = (await res.json().catch(() => null)) as
+        | { success?: boolean; data?: { user?: AuthUser } }
+        | null;
+
+      if (!res.ok || !json?.success) {
+        setUser(null);
+        return;
+      }
+
+      setUser((json.data?.user as AuthUser) ?? null);
+    } catch {
+      setUser(null);
     }
   };
 
   useEffect(() => {
     const initAuth = async () => {
       setIsLoading(true);
-      
+
       try {
-        // Get initial session
-        const { data: { session: initialSession }, error: sessionError } = await supabase.auth.getSession();
-        
-        if (sessionError) {
-          console.error('Error getting session:', sessionError);
-          setIsLoading(false);
-          return;
-        }
-        
-        setSession(initialSession);
-        
-        if (initialSession?.user) {
-          const profile = await fetchUserProfile(initialSession.user);
-          setUser(profile);
-        }
+        await refreshUser();
       } catch (error) {
         console.error('Error initializing auth:', error);
       } finally {
@@ -108,66 +85,169 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
 
     initAuth();
-
-    // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event: string, newSession: Session | null) => {
-        try {
-          setSession(newSession);
-          
-          if (event === 'SIGNED_IN' && newSession?.user) {
-            const profile = await fetchUserProfile(newSession.user);
-            setUser(profile);
-          } else if (event === 'SIGNED_OUT') {
-            setUser(null);
-          } else if (event === 'USER_UPDATED' && newSession?.user) {
-            const profile = await fetchUserProfile(newSession.user);
-            setUser(profile);
-          }
-        } catch (error) {
-          console.error('Error handling auth state change:', error);
-        }
-      }
-    );
-
-    return () => {
-      subscription.unsubscribe();
-    };
   }, []);
 
-  const login = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
-    return { error: error as Error | null };
+  const sendOtp = async (phone: string, countryCode?: string): Promise<SendOtpResult> => {
+    try {
+      const res = await fetch('/api/auth/send-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone, countryCode }),
+      });
+      const json = (await res.json().catch(() => null)) as
+        | { success?: boolean; error?: { message?: string }; data?: { otpRequired?: boolean; loggedIn?: boolean; reqId?: string } }
+        | null;
+
+      if (!res.ok || !json?.success) {
+        return { error: new Error(json?.error?.message || 'Failed to send OTP') };
+      }
+
+      if (json.data?.loggedIn) {
+        await refreshUser();
+      }
+
+      return {
+        error: null,
+        otpRequired: !!json.data?.otpRequired,
+        loggedIn: !!json.data?.loggedIn,
+        reqId: json.data?.reqId, // MSG91 Widget API returns this
+      };
+    } catch (e) {
+      return { error: e instanceof Error ? e : new Error('Failed to send OTP') };
+    }
   };
 
-  const signup = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        emailRedirectTo: `${window.location.origin}/auth/callback`,
-      },
-    });
-    return { error: error as Error | null };
+  const verifyOtp = async (params: {
+    phone: string;
+    countryCode?: string;
+    otp: string;
+    name?: string;
+    reqId?: string;
+  }) => {
+    try {
+      const res = await fetch('/api/auth/verify-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          phone: params.phone,
+          countryCode: params.countryCode,
+          otp: params.otp,
+          name: params.name,
+        }),
+      });
+      const json = (await res.json().catch(() => null)) as
+        | { success?: boolean; error?: { message?: string }; data?: { user?: AuthUser } }
+        | null;
+
+      if (!res.ok || !json?.success) {
+        return { error: new Error(json?.error?.message || 'OTP verification failed') };
+      }
+
+      setUser((json.data?.user as AuthUser) ?? null);
+      return { error: null };
+    } catch (e) {
+      return { error: e instanceof Error ? e : new Error('OTP verification failed') };
+    }
   };
 
-  const loginWithGoogle = async () => {
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: {
-        redirectTo: `${window.location.origin}/auth/callback`,
-      },
-    });
-    return { error: error as Error | null };
+  const login = async (identifier: string, password: string, countryCode?: string): Promise<LoginResult> => {
+    try {
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ identifier, password, countryCode }),
+      });
+      const json = (await res.json().catch(() => null)) as
+        | { success?: boolean; error?: { message?: string }; data?: { user?: AuthUser } }
+        | null;
+
+      if (!res.ok || !json?.success) {
+        return { error: new Error(json?.error?.message || 'Login failed') };
+      }
+
+      setUser((json.data?.user as AuthUser) ?? null);
+      return { error: null };
+    } catch (e) {
+      return { error: e instanceof Error ? e : new Error('Login failed') };
+    }
+  };
+
+  const signup = async (
+    email: string,
+    name: string,
+    phone: string,
+    countryCode: string,
+    password: string,
+    confirmPassword: string
+  ): Promise<SignupResult> => {
+    try {
+      const res = await fetch('/api/auth/signup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email,
+          name,
+          phone,
+          countryCode,
+          password,
+          confirmPassword,
+        }),
+      });
+      const json = (await res.json().catch(() => null)) as
+        | { success?: boolean; error?: { message?: string }; data?: { otpRequired?: boolean } }
+        | null;
+
+      if (!res.ok || !json?.success) {
+        return { error: new Error(json?.error?.message || 'Signup failed') };
+      }
+
+      return {
+        error: null,
+        otpRequired: !!json.data?.otpRequired,
+      };
+    } catch (e) {
+      return { error: e instanceof Error ? e : new Error('Signup failed') };
+    }
+  };
+
+  const signupVerifyOtp = async (
+    email: string,
+    phone: string,
+    countryCode: string,
+    otp: string
+  ): Promise<SignupVerifyOtpResult> => {
+    try {
+      const res = await fetch('/api/auth/signup/verify-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email,
+          phone,
+          countryCode,
+          otp,
+        }),
+      });
+      const json = (await res.json().catch(() => null)) as
+        | { success?: boolean; error?: { message?: string }; data?: { user?: AuthUser } }
+        | null;
+
+      if (!res.ok || !json?.success) {
+        return { error: new Error(json?.error?.message || 'OTP verification failed') };
+      }
+
+      setUser((json.data?.user as AuthUser) ?? null);
+      return { error: null };
+    } catch (e) {
+      return { error: e instanceof Error ? e : new Error('OTP verification failed') };
+    }
   };
 
   const logout = async () => {
-    await supabase.auth.signOut();
-    setUser(null);
-    setSession(null);
+    try {
+      await fetch('/api/auth/logout', { method: 'POST' });
+    } finally {
+      setUser(null);
+    }
   };
 
   const isAdmin = user?.roles?.some(
@@ -178,13 +258,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     <AuthContext.Provider
       value={{
         user,
-        session,
-        isAuthenticated: !!session,
+        isAuthenticated: !!user,
         isAdmin,
         isLoading,
         login,
         signup,
-        loginWithGoogle,
+        signupVerifyOtp,
+        sendOtp,
+        verifyOtp,
         logout,
         refreshUser,
       }}

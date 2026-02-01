@@ -10,6 +10,12 @@ export const selectProductsError = createSelector([selectProductsState], (produc
 export const selectProductsFilters = createSelector([selectProductsState], (products) => products.filters);
 export const selectProductsPagination = createSelector([selectProductsState], (products) => products.pagination);
 export const selectSelectedProduct = createSelector([selectProductsState], (products) => products.selectedProduct);
+export const selectProductsCache = createSelector([selectProductsState], (products) => products.productsCache);
+export const selectProductsLoaded = createSelector([selectProductsState], (products) => products.productsLoaded);
+
+// Selector to get a product from cache by ID
+export const selectProductFromCache = (productId: string) =>
+  createSelector([selectProductsCache], (cache) => cache[productId] || null);
 
 export const selectFilteredProducts = createSelector(
   [selectProducts, selectProductsFilters],

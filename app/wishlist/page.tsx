@@ -6,6 +6,8 @@ import { Trash2, ShoppingBag, ArrowRight, Heart } from 'lucide-react';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import { wishlistActions } from '../../store/slices/wishlist/wishlistSlice';
 import { selectWishlistItems, selectWishlistLoading, selectWishlistError } from '../../store/slices/wishlist/wishlistSelectors';
+import { userDataActions } from '../../store/slices/userData/userDataSlice';
+import { selectUserDataLoaded } from '../../store/slices/userData/userDataSelectors';
 import { useCart } from '../../context/CartContext';
 import ProtectedRoute from '../../components/ProtectedRoute';
 import AccountLayout from '../../components/AccountLayout';
@@ -16,11 +18,15 @@ function WishlistContent() {
   const wishlist = useAppSelector(selectWishlistItems);
   const loading = useAppSelector(selectWishlistLoading);
   const error = useAppSelector(selectWishlistError);
+  const userDataLoaded = useAppSelector(selectUserDataLoaded);
   const { addToCart } = useCart();
 
   useEffect(() => {
-    dispatch(wishlistActions.fetchWishlistRequest());
-  }, [dispatch]);
+    // Only fetch if userData hasn't been loaded yet (cache check)
+    if (!userDataLoaded) {
+      dispatch(userDataActions.fetchUserDataRequest());
+    }
+  }, [dispatch, userDataLoaded]);
 
   const handleMoveToCart = (e: React.MouseEvent, product: any) => {
     e.preventDefault();

@@ -10,3 +10,6 @@ ALTER TABLE "public"."addresses"
 ALTER COLUMN "phone" DROP DEFAULT;
 
 
+
+
+

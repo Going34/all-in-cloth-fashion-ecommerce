@@ -111,7 +111,18 @@ export async function findProductsByCursor(
   }
 
   if (error) {
-    throw new Error(`Failed to fetch products: ${error.message}`);
+    // Provide more detailed error information for debugging
+    const errorMessage = error.message || 'Unknown error';
+    const errorCode = (error as any).code || 'UNKNOWN';
+    const errorDetails = (error as any).details || '';
+    const errorHint = (error as any).hint || '';
+    
+    // Check if it's a network/fetch error
+    if (errorMessage.includes('fetch failed') || errorMessage.includes('network') || errorCode === 'ENOTFOUND' || errorCode === 'ECONNREFUSED') {
+      throw new Error(`Database connection failed. Please check: 1) Supabase URL is correct and accessible, 2) Network connectivity from server to Supabase, 3) Environment variables are set correctly. Original error: ${errorMessage}`);
+    }
+    
+    throw new Error(`Failed to fetch products: ${errorMessage}${errorCode ? ` (Code: ${errorCode})` : ''}${errorDetails ? ` - ${errorDetails}` : ''}${errorHint ? ` - Hint: ${errorHint}` : ''}`);
   }
 
   const products = ((data as unknown[]) || []).map(transformProduct) as ProductWithDetails[];

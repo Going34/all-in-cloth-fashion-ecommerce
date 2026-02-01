@@ -8,6 +8,8 @@ import { ordersActions } from '../../store/slices/orders/ordersSlice';
 import { selectOrders, selectOrdersLoading, selectOrdersError } from '../../store/slices/orders/ordersSelectors';
 import { addressesActions } from '../../store/slices/addresses/addressesSlice';
 import { selectDefaultAddress } from '../../store/slices/addresses/addressesSelectors';
+import { userDataActions } from '../../store/slices/userData/userDataSlice';
+import { selectUserDataLoaded } from '../../store/slices/userData/userDataSelectors';
 import { useAuth } from '../../context/AuthContext';
 import ProtectedRoute from '../../components/ProtectedRoute';
 import AccountLayout from '../../components/AccountLayout';
@@ -19,12 +21,13 @@ function AccountContent() {
   const loading = useAppSelector(selectOrdersLoading);
   const error = useAppSelector(selectOrdersError);
   const defaultAddress = useAppSelector(selectDefaultAddress);
+  const userDataLoaded = useAppSelector(selectUserDataLoaded);
   const { user } = useAuth();
 
   useEffect(() => {
     if (user?.id) {
-      dispatch(ordersActions.fetchUserOrdersRequest({ limit: 10 }));
-      dispatch(addressesActions.fetchDefaultAddressRequest());
+      // Use unified userData fetch instead of separate calls
+      dispatch(userDataActions.fetchUserDataRequest());
     }
   }, [dispatch, user?.id]);
 

@@ -1,34 +1,44 @@
-import { getDbClient } from './db';
 import { UnauthorizedError, ForbiddenError } from './errors';
+import { getSessionCookie } from './session';
+import { verifySessionToken } from './jwt';
+import { getAdminDbClient } from './adminDb';
 
 export interface AuthUser {
   id: string;
-  email: string;
+  email: string | null;
   roles?: string[];
 }
 
 export async function getCurrentUser(): Promise<AuthUser | null> {
   try {
-    const supabase = await getDbClient();
-    const {
-      data: { user },
-      error,
-    } = await supabase.auth.getUser();
-
-    if (error || !user) {
+    const token = await getSessionCookie();
+    if (!token) {
       return null;
     }
 
-    const { data: roles } = await supabase
+    const payload = await verifySessionToken(token);
+    const db = getAdminDbClient();
+
+    const { data: profile, error: profileError } = await db
+      .from('users')
+      .select('id,email')
+      .eq('id', payload.sub)
+      .single();
+
+    if (profileError || !profile) {
+      return null;
+    }
+
+    const { data: roles } = await db
       .from('user_roles')
       .select('roles(name)')
-      .eq('user_id', user.id);
+      .eq('user_id', payload.sub);
 
     const roleNames = roles?.map((r: any) => r.roles?.name).filter(Boolean) || [];
 
     return {
-      id: user.id,
-      email: user.email || '',
+      id: profile.id,
+      email: profile.email ?? null,
       roles: roleNames,
     };
   } catch {
@@ -61,6 +71,7 @@ export async function requireRole(role: string): Promise<AuthUser> {
   }
   return user;
 }
+
 
 
 

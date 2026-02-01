@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server';
 import { successResponse, errorResponse } from '@/lib/response';
 import { requireAuth } from '@/lib/auth';
-import { getDbClient } from '@/lib/db';
+import { getAdminDbClient } from '@/lib/adminDb';
 import { NotFoundError } from '@/lib/errors';
 import type { Address, AddressInput } from '@/types';
 
@@ -12,9 +12,9 @@ export async function GET(
   try {
     const { id } = await params;
     const user = await requireAuth();
-    const supabase = await getDbClient();
+    const db = getAdminDbClient();
 
-    const { data, error } = await supabase
+    const { data, error } = await db
       .from('addresses')
       .select('*')
       .eq('id', id)
@@ -50,10 +50,10 @@ export async function PUT(
     if (body.phone !== undefined) updates.phone = body.phone;
     if (body.is_default !== undefined) updates.is_default = body.is_default;
 
-    const supabase = await getDbClient();
+    const db = getAdminDbClient();
 
     // Check if address exists and belongs to user
-    const { data: existing } = await supabase
+    const { data: existing } = await db
       .from('addresses')
       .select('id')
       .eq('id', id)
@@ -66,13 +66,13 @@ export async function PUT(
 
     // If setting as default, remove default from others
     if (updates.is_default) {
-      await supabase
+      await db
         .from('addresses')
         .update({ is_default: false } as any)
         .eq('user_id', user.id);
     }
 
-    const { data, error } = await supabase
+    const { data, error } = await db
       .from('addresses')
       .update(updates as any)
       .eq('id', id)
@@ -97,10 +97,10 @@ export async function DELETE(
   try {
     const { id } = await params;
     const user = await requireAuth();
-    const supabase = await getDbClient();
+    const db = getAdminDbClient();
 
     // Check if address exists and belongs to user
-    const { data: existing } = await supabase
+    const { data: existing } = await db
       .from('addresses')
       .select('id')
       .eq('id', id)
@@ -111,7 +111,7 @@ export async function DELETE(
       throw new NotFoundError('Address', id);
     }
 
-    const { error } = await supabase
+    const { error } = await db
       .from('addresses')
       .delete()
       .eq('id', id)

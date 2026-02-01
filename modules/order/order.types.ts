@@ -1,4 +1,4 @@
-import type { Order, OrderItem, OrderStatus, OrderStatusHistory } from '@/types';
+import type { Order, OrderItem, OrderStatus, OrderStatusHistory, Payment } from '@/types';
 
 export interface CreateOrderRequest {
   items: Array<{
@@ -12,6 +12,7 @@ export interface CreateOrderRequest {
 export interface OrderResponse extends Order {
   items: OrderItem[];
   status_history?: OrderStatusHistory[];
+  payment?: Payment | null;
 }
 
 export interface OrderListQuery {

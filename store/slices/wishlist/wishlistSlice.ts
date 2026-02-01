@@ -75,6 +75,11 @@ const wishlistSlice = createSlice({
     clearWishlist: (state) => {
       state.items = [];
     },
+    // Batch update from userData
+    batchUpdateWishlist: (state, action: PayloadAction<Product[]>) => {
+      state.items = action.payload;
+      state.error = null;
+    },
   },
 });
 
