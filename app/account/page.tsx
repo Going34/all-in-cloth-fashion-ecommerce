@@ -5,11 +5,9 @@ import Link from 'next/link';
 import { Package, ChevronRight } from 'lucide-react';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import { ordersActions } from '../../store/slices/orders/ordersSlice';
-import { selectOrders, selectOrdersLoading, selectOrdersError } from '../../store/slices/orders/ordersSelectors';
-import { addressesActions } from '../../store/slices/addresses/addressesSlice';
+import { selectOrders, selectOrdersLoading, selectOrdersError, selectOrdersHasMore, selectOrdersLoadingMore } from '../../store/slices/orders/ordersSelectors';
 import { selectDefaultAddress } from '../../store/slices/addresses/addressesSelectors';
 import { userDataActions } from '../../store/slices/userData/userDataSlice';
-import { selectUserDataLoaded } from '../../store/slices/userData/userDataSelectors';
 import { useAuth } from '../../context/AuthContext';
 import ProtectedRoute from '../../components/ProtectedRoute';
 import AccountLayout from '../../components/AccountLayout';
@@ -19,15 +17,17 @@ function AccountContent() {
   const dispatch = useAppDispatch();
   const orders = useAppSelector(selectOrders);
   const loading = useAppSelector(selectOrdersLoading);
+  const loadingMore = useAppSelector(selectOrdersLoadingMore);
+  const hasMore = useAppSelector(selectOrdersHasMore);
   const error = useAppSelector(selectOrdersError);
   const defaultAddress = useAppSelector(selectDefaultAddress);
-  const userDataLoaded = useAppSelector(selectUserDataLoaded);
   const { user } = useAuth();
 
   useEffect(() => {
     if (user?.id) {
       // Use unified userData fetch instead of separate calls
       dispatch(userDataActions.fetchUserDataRequest());
+      dispatch(ordersActions.fetchUserOrdersRequest({ limit: 10 }));
     }
   }, [dispatch, user?.id]);
 
@@ -37,7 +37,7 @@ function AccountContent() {
           <section className="bg-white border border-neutral-100 rounded-xl overflow-hidden">
             <div className="p-6 border-b border-neutral-100 flex justify-between items-center">
               <h3 className="text-lg font-medium">Recent Orders</h3>
-              <button className="text-sm text-neutral-400 hover:text-neutral-900 transition-colors">View All</button>
+              {/* <button className="text-sm text-neutral-400 hover:text-neutral-900 transition-colors">View All</button> */}
             </div>
             {loading && (
               <div className="p-6 text-center">
@@ -77,12 +77,23 @@ function AccountContent() {
                         {order.status}
                       </span>
                     </div>
-                    <button className="text-neutral-300 hover:text-neutral-900">
+                    <button className="text-neutral-300 hover:text-neutral-900" aria-label="View order details">
                       <ChevronRight size={20} />
                     </button>
                   </div>
                 </div>
                 ))}
+              </div>
+            )}
+            {!loading && !error && hasMore && (
+              <div className="p-6 border-t border-neutral-100 flex justify-center">
+                <button
+                  onClick={() => dispatch(ordersActions.fetchUserOrdersNextPageRequest())}
+                  disabled={loadingMore}
+                  className="px-4 py-2 text-sm border border-neutral-200 rounded-lg hover:border-neutral-400 disabled:opacity-50"
+                >
+                  {loadingMore ? 'Loading...' : 'Load more'}
+                </button>
               </div>
             )}
           </section>

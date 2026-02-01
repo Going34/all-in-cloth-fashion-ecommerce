@@ -4,6 +4,20 @@ import React, { useState, Suspense, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Mail, Phone, Lock, LogIn } from 'lucide-react';
+import { useAuth } from '@/context/AuthContext';
+
+function getSafeRedirectPath(input: string | null): string {
+  const fallback = '/';
+  if (!input) return fallback;
+  const trimmed = input.trim();
+  if (!trimmed) return fallback;
+  if (!trimmed.startsWith('/')) return fallback;
+  if (trimmed.startsWith('//')) return fallback;
+  if (trimmed.includes('://')) return fallback;
+  if (trimmed === '/login' || trimmed.startsWith('/login?')) return fallback;
+  if (trimmed === '/signup' || trimmed.startsWith('/signup?')) return fallback;
+  return trimmed;
+}
 
 function LoginForm() {
   const [identifier, setIdentifier] = useState('');
@@ -13,8 +27,9 @@ function LoginForm() {
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { isAuthenticated, isLoading: isAuthLoading } = useAuth();
 
-  const from = searchParams.get('from') || '/';
+  const from = getSafeRedirectPath(searchParams.get('from'));
 
   useEffect(() => {
     const urlError = searchParams.get('error');
@@ -25,6 +40,12 @@ function LoginForm() {
       window.history.replaceState({}, '', newUrl.toString());
     }
   }, [searchParams]);
+
+  useEffect(() => {
+    if (isAuthLoading) return;
+    if (!isAuthenticated) return;
+    router.replace(from);
+  }, [from, isAuthenticated, isAuthLoading, router]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -60,6 +81,21 @@ function LoginForm() {
   };
 
   const isEmail = identifier.includes('@');
+
+  if (isAuthLoading) {
+    return (
+      <div className="min-h-[80vh] flex items-center justify-center">
+        <div className="text-center">
+          <h1 className="text-4xl font-serif">Welcome Back</h1>
+          <p className="text-neutral-500 mt-4">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (isAuthenticated) {
+    return null;
+  }
 
   return (
     <div className="min-h-[80vh] flex items-center justify-center px-4 py-20">

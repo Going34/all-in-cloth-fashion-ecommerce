@@ -134,7 +134,7 @@ describe('POST /api/webhooks/razorpay', () => {
         expect.objectContaining({
           status: 'failed',
         }),
-        undefined,
+        'cancelled',
         undefined
       );
     });

@@ -5,18 +5,20 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useCart } from '../../context/CartContext';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
-import { ordersActions } from '../../store/slices/orders/ordersSlice';
 import { selectOrdersLoading, selectOrdersError, selectSelectedOrder } from '../../store/slices/orders/ordersSelectors';
 import { addressesActions } from '../../store/slices/addresses/addressesSlice';
 import { selectAddresses, selectAddressesLoading, selectAddressesError, selectDefaultAddress } from '../../store/slices/addresses/addressesSelectors';
 import { CheckCircle2, ChevronLeft, CreditCard, Truck, MapPin, Plus, Loader2 } from 'lucide-react';
 import ProtectedRoute from '../../components/ProtectedRoute';
 import { formatCurrency } from '../../utils/currency';
-import type { Address, AddressInput } from '../../types';
+import type { AddressInput } from '../../types';
+
+type RazorpayCheckoutInstance = { open: () => void };
+type RazorpayConstructor = new (options: Record<string, unknown>) => RazorpayCheckoutInstance;
 
 declare global {
   interface Window {
-    Razorpay: any;
+    Razorpay: RazorpayConstructor;
   }
 }
 
@@ -51,10 +53,32 @@ function CheckoutContent() {
   const [razorpayLoaded, setRazorpayLoaded] = useState(false);
   const razorpayScriptLoaded = useRef(false);
   const redirectStarted = useRef(false);
+  const orderIdRef = useRef<string | null>(null);
+  const paymentCompletedRef = useRef(false);
+  const cancelRequestedRef = useRef(false);
 
   const shipping = 15;
   const tax = totalPrice * 0.08;
   const grandTotal = totalPrice + shipping + tax;
+
+  const getDeliveryDateRange = (includeYear = true) => {
+    const today = new Date();
+    const start = new Date(today);
+    start.setDate(today.getDate() + 3);
+    const end = new Date(today);
+    end.setDate(today.getDate() + 5);
+
+    const options: Intl.DateTimeFormatOptions = { month: 'short', day: 'numeric' };
+    const startStr = start.toLocaleDateString('en-US', options);
+    
+    if (includeYear) {
+        const endStr = end.toLocaleDateString('en-US', { ...options, year: 'numeric' });
+        return `${startStr} - ${endStr}`;
+    } else {
+        const endStr = end.toLocaleDateString('en-US', options);
+        return `${startStr} - ${endStr}`;
+    }
+  };
 
   useEffect(() => {
     if (isSuccess) return;
@@ -228,6 +252,9 @@ function CheckoutContent() {
 
       const orderData = await orderResponse.json();
       const order = orderData.data;
+      orderIdRef.current = order?.id || null;
+      paymentCompletedRef.current = false;
+      cancelRequestedRef.current = false;
 
       const paymentResponse = await fetch('/api/payments/create', {
         method: 'POST',
@@ -254,7 +281,11 @@ function CheckoutContent() {
         name: paymentConfig.name,
         description: paymentConfig.description,
         order_id: paymentConfig.razorpay_order_id,
-        handler: async function (response: any) {
+        handler: async function (response: {
+          razorpay_order_id: string;
+          razorpay_payment_id: string;
+          razorpay_signature: string;
+        }) {
           try {
             setIsProcessingPayment(true);
             setPaymentError(null);
@@ -279,6 +310,7 @@ function CheckoutContent() {
             const verifyData = await verifyResponse.json();
             
             if (verifyData.data.success) {
+              paymentCompletedRef.current = true;
               if (!redirectStarted.current) {
                 redirectStarted.current = true;
                 setIsSuccess(true);
@@ -290,9 +322,13 @@ function CheckoutContent() {
             } else {
               setPaymentError('Payment verification failed. Please contact support.');
             }
-          } catch (error: any) {
+          } catch (error: unknown) {
             console.error('Payment verification error:', error);
-            setPaymentError(error.message || 'Payment verification failed. Please contact support.');
+            setPaymentError(
+              error instanceof Error
+                ? error.message
+                : 'Payment verification failed. Please contact support.'
+            );
           } finally {
             setIsProcessingPayment(false);
           }
@@ -309,15 +345,21 @@ function CheckoutContent() {
           ondismiss: function() {
             setIsProcessingPayment(false);
             setPaymentError('Payment was cancelled');
+            const orderId = orderIdRef.current;
+            if (!orderId || paymentCompletedRef.current || cancelRequestedRef.current) {
+              return;
+            }
+            cancelRequestedRef.current = true;
+            fetch(`/api/orders/${orderId}/cancel`, { method: 'POST' }).catch(() => {});
           },
         },
       };
 
-      const razorpay = new window.Razorpay(options);
+      const razorpay = new window.Razorpay(options as Record<string, unknown>);
       razorpay.open();
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Order creation error:', error);
-      setPaymentError(error.message || 'Failed to process payment. Please try again.');
+      setPaymentError(error instanceof Error ? error.message : 'Failed to process payment. Please try again.');
       setIsProcessingPayment(false);
     }
   };
@@ -329,7 +371,7 @@ function CheckoutContent() {
           <CheckCircle2 size={64} className="text-green-500" />
         </div>
         <h1 className="text-3xl font-serif">Order Confirmed!</h1>
-        <p className="text-neutral-500">Thank you for your purchase. We've sent a confirmation email to your inbox and will notify you as soon as your order ships.</p>
+        <p className="text-neutral-500">Thank you for your purchase. We have sent a confirmation email to your inbox and will notify you as soon as your order ships.</p>
         <div className="bg-neutral-50 p-6 rounded-lg text-sm text-left">
           <p className="font-bold mb-2">Order Summary</p>
           {createdOrder && (
@@ -340,7 +382,7 @@ function CheckoutContent() {
           )}
           <div className="flex justify-between py-1 text-neutral-600">
             <span>Estimated Delivery:</span>
-            <span>Oct 21 - Oct 24</span>
+            <span>{getDeliveryDateRange(false)}</span>
           </div>
         </div>
         <p className="text-xs text-neutral-400">Redirecting to homepage...</p>
@@ -625,16 +667,6 @@ function CheckoutContent() {
                 </div>
                 <span className="font-semibold">{formatCurrency(15)}</span>
               </label>
-              <label className="flex items-center justify-between p-4 border border-neutral-200 rounded-lg opacity-50 cursor-not-allowed">
-                <div className="flex items-center space-x-3">
-                  <div className="text-neutral-400"><Truck size={20} /></div>
-                  <div>
-                    <p className="font-medium">Express Courier</p>
-                    <p className="text-xs text-neutral-500">1-2 Business Days</p>
-                  </div>
-                </div>
-                <span className="font-semibold">{formatCurrency(45)}</span>
-              </label>
             </div>
           </div>
 
@@ -702,7 +734,7 @@ function CheckoutContent() {
             <div className="space-y-4 max-h-96 overflow-y-auto pr-2">
               {cart.map((item) => (
                 <div key={item.variant_id} className="flex space-x-4">
-                  <div className="w-20 h-24 bg-neutral-200 rounded overflow-hidden flex-shrink-0">
+                  <div className="w-20 h-24 bg-neutral-200 rounded overflow-hidden shrink-0">
                     <img src={item.image_url} alt={item.product_name} className="w-full h-full object-cover" />
                   </div>
                   <div className="flex-1 flex flex-col justify-center">
@@ -742,7 +774,7 @@ function CheckoutContent() {
               </div>
               <div>
                 <p className="text-xs font-bold uppercase">Estimated Delivery</p>
-                <p className="text-[10px] text-neutral-500">Oct 21 - Oct 24, 2023</p>
+                <p className="text-[10px] text-neutral-500">{getDeliveryDateRange(true)}</p>
               </div>
             </div>
           </div>

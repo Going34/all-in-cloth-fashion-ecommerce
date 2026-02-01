@@ -1,12 +1,11 @@
 import { NextRequest } from 'next/server';
 import { successResponse, errorResponse } from '@/lib/response';
-import { verifyWebhookSignature, fetchPayment, fetchOrder } from '@/services/razorpayService';
+import { verifyWebhookSignature } from '@/services/razorpayService';
 import { getSettings } from '@/modules/settings/settings.repository';
 import {
   findPaymentByOrderId,
   updatePaymentStatus,
 } from '@/modules/payment/payment.repository';
-import { getAdminDbClient } from '@/lib/adminDb';
 
 interface RazorpayWebhookEvent {
   entity: string;
@@ -43,7 +42,7 @@ interface RazorpayWebhookEvent {
         error_source: string | null;
         error_step: string | null;
         error_reason: string | null;
-        acquirer_data: Record<string, any>;
+        acquirer_data: Record<string, unknown>;
         created_at: number;
       };
     };
@@ -147,7 +146,7 @@ async function handlePaymentFailed(event: RazorpayWebhookEvent): Promise<void> {
       gateway_txn_id: payment.id,
       raw_response: payment,
     },
-    undefined,
+    'cancelled',
     payment.order_id
   );
 
@@ -224,7 +223,7 @@ export async function POST(request: NextRequest) {
     }
 
     return successResponse({ received: true, event: event.event });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Razorpay webhook error:', error);
     return errorResponse(error, 500);
   }

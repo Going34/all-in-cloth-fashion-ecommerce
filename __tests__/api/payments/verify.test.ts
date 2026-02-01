@@ -75,7 +75,7 @@ describe('POST /api/payments/verify', () => {
         id: 'payment-123',
         status: 'failed',
       },
-      order_status: 'pending',
+      order_status: 'cancelled',
     };
 
     (requireAuth as jest.Mock).mockResolvedValue(mockUser);
@@ -97,6 +97,7 @@ describe('POST /api/payments/verify', () => {
     expect(response.status).toBe(200);
     expect(data.data.success).toBe(false);
     expect(data.data.payment_status).toBe('failed');
+    expect(data.data.order_status).toBe('cancelled');
   });
 
   it('should return 401 when user is not authenticated', async () => {

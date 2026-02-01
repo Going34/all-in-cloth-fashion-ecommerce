@@ -1,7 +1,7 @@
 'use client';
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import type { User, Role } from '@/types';
+import type { User, Role, RoleType } from '@/types';
 
 interface AuthUser extends User {
   roles: Role[];
@@ -57,7 +57,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       const res = await fetch('/api/auth/me', { method: 'GET' });
       const json = (await res.json().catch(() => null)) as
-        | { success?: boolean; data?: { user?: AuthUser } }
+        | { success?: boolean; data?: { user?: AuthUser | any } }
         | null;
 
       if (!res.ok || !json?.success) {
@@ -65,7 +65,29 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return;
       }
 
-      setUser((json.data?.user as AuthUser) ?? null);
+      const userData = json.data?.user;
+      if (!userData) {
+        setUser(null);
+        return;
+      }
+
+      // Normalize roles format - API returns string[] but AuthUser expects Role[]
+      let normalizedRoles: Role[] = [];
+      if (userData.roles) {
+        if (Array.isArray(userData.roles)) {
+          normalizedRoles = userData.roles.map((role: string | Role) => {
+            if (typeof role === 'string') {
+              return { id: '', name: role as RoleType };
+            }
+            return role as Role;
+          });
+        }
+      }
+
+      setUser({
+        ...userData,
+        roles: normalizedRoles,
+      } as AuthUser);
     } catch {
       setUser(null);
     }
@@ -251,7 +273,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const isAdmin = user?.roles?.some(
-    (role) => role.name === 'ADMIN' || role.name === 'OPS'
+    (role) => {
+      if (typeof role === 'string') {
+        return role === 'ADMIN' || role === 'OPS';
+      }
+      return role.name === 'ADMIN' || role.name === 'OPS';
+    }
   ) ?? false;
 
   return (

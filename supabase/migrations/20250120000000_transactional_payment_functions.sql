@@ -146,6 +146,7 @@ DECLARE
     v_current_payment_status VARCHAR(50);
     v_current_order_status VARCHAR(50);
     v_result JSONB;
+    v_item RECORD;
 BEGIN
     -- Get current payment status and order_id
     SELECT status, order_id INTO v_current_payment_status, v_order_id
@@ -240,6 +241,28 @@ BEGIN
             VALUES (v_order_id, p_order_status::order_status);
         END IF;
     END IF;
+
+    -- Cancel order + release reserved inventory if payment failed
+    IF p_payment_status = 'failed' THEN
+        -- Only cancel/release once: pending -> cancelled
+        IF v_current_order_status = 'pending' THEN
+            UPDATE orders
+            SET status = 'cancelled'::order_status,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = v_order_id;
+
+            INSERT INTO order_status_history (order_id, status)
+            VALUES (v_order_id, 'cancelled'::order_status);
+
+            FOR v_item IN
+              SELECT variant_id, quantity FROM order_items WHERE order_id = v_order_id
+            LOOP
+              IF v_item.variant_id IS NOT NULL THEN
+                PERFORM public.release_reserved_inventory(v_item.variant_id, v_item.quantity);
+              END IF;
+            END LOOP;
+        END IF;
+    END IF;
     
     RETURN jsonb_build_object(
         'success', true,
@@ -270,6 +293,8 @@ DECLARE
     v_payment_id UUID;
     v_current_status VARCHAR(50);
     v_result JSONB;
+    v_current_order_status VARCHAR(50);
+    v_item RECORD;
 BEGIN
     -- Find payment by order_id
     SELECT id, status INTO v_payment_id, v_current_status
@@ -356,6 +381,32 @@ BEGIN
         VALUES (p_order_id, 'paid')
         ON CONFLICT DO NOTHING;
     END IF;
+
+    -- Cancel order + release reserved inventory if payment failed
+    IF p_payment_status = 'failed' THEN
+        SELECT status INTO v_current_order_status
+        FROM orders
+        WHERE id = p_order_id
+        FOR UPDATE;
+
+        IF v_current_order_status = 'pending' THEN
+            UPDATE orders
+            SET status = 'cancelled'::order_status,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = p_order_id;
+
+            INSERT INTO order_status_history (order_id, status)
+            VALUES (p_order_id, 'cancelled'::order_status);
+
+            FOR v_item IN
+              SELECT variant_id, quantity FROM order_items WHERE order_id = p_order_id
+            LOOP
+              IF v_item.variant_id IS NOT NULL THEN
+                PERFORM public.release_reserved_inventory(v_item.variant_id, v_item.quantity);
+              END IF;
+            END LOOP;
+        END IF;
+    END IF;
     
     RETURN jsonb_build_object(
         'success', p_payment_status = 'completed',
@@ -364,6 +415,7 @@ BEGIN
         'payment_status', p_payment_status,
         'order_status', CASE 
             WHEN p_payment_status = 'completed' THEN 'paid'
+            WHEN p_payment_status = 'failed' THEN 'cancelled'
             ELSE (SELECT status FROM orders WHERE id = p_order_id)
         END,
         'duplicate', false

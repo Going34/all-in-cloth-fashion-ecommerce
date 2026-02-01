@@ -1,15 +1,17 @@
-import { call, put, select, takeEvery, takeLatest } from 'redux-saga/effects';
+import { call, put, select, takeLatest } from 'redux-saga/effects';
 import { apiClient } from '../../api/client';
 import { apiInterceptor } from '../../api/interceptor';
 import { userDataActions } from './userDataSlice';
-import { ordersActions } from '../orders/ordersSlice';
 import { addressesActions } from '../addresses/addressesSlice';
 import { wishlistActions } from '../wishlist/wishlistSlice';
 import { profileActions } from '../profile/profileSlice';
 import type { RootState } from '../../types';
 import type { UserDataState } from './userDataSlice';
+import type { AxiosError, AxiosResponse } from 'axios';
+import type { ApiResponse } from '../../api/interceptor';
+import type { User, Address, Product } from '@/types';
 
-function* fetchUserDataSaga(): Generator<any, void, unknown> {
+function* fetchUserDataSaga(): Generator<unknown, void, unknown> {
   try {
     // Check if user data is already loaded
     const userDataState = (yield select((state: RootState) => state.userData)) as UserDataState;
@@ -18,9 +20,6 @@ function* fetchUserDataSaga(): Generator<any, void, unknown> {
       // Data already loaded, update individual slices from cache without API call
       if (userDataState.profile) {
         yield put(profileActions.batchUpdateProfile(userDataState.profile));
-      }
-      if (userDataState.orders.length > 0) {
-        yield put(ordersActions.batchUpdateOrders(userDataState.orders));
       }
       if (userDataState.addresses.length > 0) {
         yield put(addressesActions.batchUpdateAddresses(userDataState.addresses));
@@ -38,39 +37,39 @@ function* fetchUserDataSaga(): Generator<any, void, unknown> {
     };
 
     const interceptedConfig = apiInterceptor.request(config);
-    const response = yield call(apiClient.request, interceptedConfig);
-    const transformedData = apiInterceptor.response(response as any);
+    const response = (yield call(apiClient.request, interceptedConfig)) as AxiosResponse;
+    const transformedData = apiInterceptor.response(response) as {
+      profile?: unknown;
+      addresses?: unknown[];
+      wishlist?: unknown[];
+    };
 
-    const { profile, orders, addresses, wishlist } = transformedData;
+    const { profile, addresses, wishlist } = transformedData;
 
     // Update userData slice
     yield put(userDataActions.fetchUserDataSuccess({
-      profile: profile || null,
-      orders: orders || [],
-      addresses: addresses || [],
-      wishlist: wishlist || [],
+      profile: (profile as User) || null,
+      addresses: (addresses as Address[]) || [],
+      wishlist: (wishlist as Product[]) || [],
     }));
 
     // Update individual slices for backward compatibility
     if (profile) {
-      yield put(profileActions.batchUpdateProfile(profile));
-    }
-    if (orders && orders.length > 0) {
-      yield put(ordersActions.batchUpdateOrders(orders));
+      yield put(profileActions.batchUpdateProfile(profile as User));
     }
     if (addresses && addresses.length > 0) {
-      yield put(addressesActions.batchUpdateAddresses(addresses));
+      yield put(addressesActions.batchUpdateAddresses(addresses as Address[]));
     }
     if (wishlist && wishlist.length > 0) {
-      yield put(wishlistActions.batchUpdateWishlist(wishlist));
+      yield put(wishlistActions.batchUpdateWishlist(wishlist as Product[]));
     }
-  } catch (error: any) {
-    const processedError = apiInterceptor.error(error);
+  } catch (error: unknown) {
+    const processedError = apiInterceptor.error(error as unknown as AxiosError<ApiResponse>);
     yield put(userDataActions.fetchUserDataFailure(processedError.message));
   }
 }
 
-export function* userDataSaga(): Generator<any, void, unknown> {
+export function* userDataSaga(): Generator<unknown, void, unknown> {
   yield takeLatest(userDataActions.fetchUserDataRequest.type, fetchUserDataSaga);
 }
 

@@ -2,7 +2,9 @@
 
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { Phone, User, Sparkles, KeyRound, RefreshCw, Mail, Lock } from 'lucide-react';
+import { useAuth } from '@/context/AuthContext';
 
 const PENDING_SIGNUP_STORAGE_KEY = 'pending_signup_v1';
 
@@ -15,6 +17,9 @@ type PendingSignup = {
 };
 
 export default function Signup() {
+  const router = useRouter();
+  const { isAuthenticated, isLoading: isAuthLoading } = useAuth();
+
   const [email, setEmail] = useState('');
   const [name, setName] = useState('');
   const [countryCode, setCountryCode] = useState('91');
@@ -27,6 +32,12 @@ export default function Signup() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (isAuthLoading) return;
+    if (!isAuthenticated) return;
+    router.replace('/');
+  }, [isAuthenticated, isAuthLoading, router]);
 
   useEffect(() => {
     try {
@@ -44,6 +55,21 @@ export default function Signup() {
       sessionStorage.removeItem(PENDING_SIGNUP_STORAGE_KEY);
     }
   }, []);
+
+  if (isAuthLoading) {
+    return (
+      <div className="min-h-[80vh] flex items-center justify-center">
+        <div className="text-center">
+          <h1 className="text-4xl font-serif">Join the Inner Circle</h1>
+          <p className="text-neutral-500 mt-4">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (isAuthenticated) {
+    return null;
+  }
 
   const handleSignup = async () => {
     setIsLoading(true);

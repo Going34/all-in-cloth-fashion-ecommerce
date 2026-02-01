@@ -235,6 +235,66 @@ export async function findOrdersByUserId(
   });
 }
 
+export async function findOrdersByUserIdPaginated(
+  userId: string,
+  filters: {
+    status?: OrderStatus;
+    page: number;
+    limit: number;
+  }
+): Promise<{ orders: OrderResponse[]; total: number }> {
+  const db = getAdminDbClient();
+  const page = filters.page || 1;
+  const limit = filters.limit || 20;
+  const offset = (page - 1) * limit;
+
+  let query = db
+    .from('orders')
+    .select(
+      `
+      *,
+      order_items (*),
+      order_status_history (*),
+      payments (*)
+    `,
+      { count: 'exact' }
+    )
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false });
+
+  if (filters.status) {
+    query = query.eq('status', filters.status);
+  }
+
+  query = query.range(offset, offset + limit - 1);
+
+  const { data, error, count } = await query;
+
+  if (error) {
+    throw new Error(`Failed to fetch orders: ${error.message}`);
+  }
+
+  const rows = (data ?? []) as unknown[];
+  const orders = rows.map((r) => {
+    const row = r as unknown as OrderResponse & {
+      order_items?: OrderItem[];
+      order_status_history?: OrderStatusHistory[];
+      payments?: Payment[];
+    };
+    return {
+      ...row,
+      items: row.order_items || [],
+      status_history: row.order_status_history || [],
+      payment: row.payments && row.payments.length > 0 ? row.payments[0] : null,
+    };
+  });
+
+  return {
+    orders,
+    total: count || 0,
+  };
+}
+
 export async function findOrderByIdAdmin(id: string): Promise<unknown | null> {
   const db = getAdminDbClient();
 

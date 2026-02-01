@@ -11,24 +11,87 @@ import {
   selectSelectedOrder
 } from '@/store/slices/orders/ordersSelectors';
 import { Search, Filter, Download, FileText, X, Package, Truck, CheckCircle2, User, MapPin, CreditCard, Loader2 } from 'lucide-react';
-import { OrderStatus, Order } from '../../types';
+import { OrderStatus } from '../../types';
 import { formatCurrency } from '../../utils/currency';
 
-// Extended Order type for admin view with customer info
-interface AdminOrder extends Order {
+interface AdminOrderListItem {
+  id: string;
+  order_number: string;
+  customer: {
+    id: string;
+    name: string;
+    email: string;
+  };
+  status: OrderStatus;
+  total: number;
+  subtotal: number;
+  tax: number;
+  shipping: number;
+  itemCount: number;
+  created_at: string;
+  updated_at: string;
+  // Fallback for strict typing if necessary
   customer_name?: string;
   customer_email?: string;
   shipping_method?: string;
 }
 
+interface AdminOrderDetail {
+  id: string;
+  orderNumber: string;
+  customer: {
+    id: string;
+    name: string;
+    email: string;
+    phone: string | null;
+  };
+  shippingAddress: {
+    name: string;
+    street: string;
+    city: string;
+    state: string;
+    zip: string;
+    country: string;
+  } | null;
+  status: OrderStatus;
+  statusHistory: { status: OrderStatus; changedAt: string }[];
+  items: {
+    id: string;
+    productName: string;
+    sku: string;
+    price: number;
+    quantity: number;
+    variantId: string;
+  }[];
+  payment: {
+    method: string;
+    status: string;
+    amount: number;
+    transactionId: string;
+  } | null;
+  shipping: {
+    method: string;
+    rate: number;
+    trackingNumber: string | null;
+  };
+  subtotal: number;
+  tax: number;
+  total: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
 const Orders: React.FC = () => {
   const dispatch = useAppDispatch();
-  const orders = useAppSelector(selectOrders);
+  const rawOrders = useAppSelector(selectOrders);
   const loading = useAppSelector(selectOrdersLoading);
   const error = useAppSelector(selectOrdersError);
   const pagination = useAppSelector(selectOrdersPagination);
-  const selectedOrder = useAppSelector(selectSelectedOrder);
+  const rawSelectedOrder = useAppSelector(selectSelectedOrder);
   
+  const orders = rawOrders as unknown as AdminOrderListItem[];
+  const selectedOrder = rawSelectedOrder as unknown as AdminOrderDetail | null;
+
   const [activeTab, setActiveTab] = useState('All');
   const [searchTerm, setSearchTerm] = useState('');
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
@@ -52,17 +115,18 @@ const Orders: React.FC = () => {
   const tabs = ['All', 'Pending', 'Paid', 'Shipped', 'Delivered', 'Cancelled'];
 
   const filteredOrders = useMemo(() => {
-    let filtered = orders as AdminOrder[];
+    let filtered = orders;
 
     if (activeTab !== 'All') {
       filtered = filtered.filter(order => order.status === activeTab);
     }
 
     if (searchTerm) {
+      const lowerTerm = searchTerm.toLowerCase();
       filtered = filtered.filter(order => 
-        order.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (order.customer_name && order.customer_name.toLowerCase().includes(searchTerm.toLowerCase())) ||
-        (order.customer_email && order.customer_email.toLowerCase().includes(searchTerm.toLowerCase()))
+        order.order_number.toLowerCase().includes(lowerTerm) ||
+        (order.customer?.name && order.customer.name.toLowerCase().includes(lowerTerm)) ||
+        (order.customer?.email && order.customer.email.toLowerCase().includes(lowerTerm))
       );
     }
 
@@ -76,13 +140,13 @@ const Orders: React.FC = () => {
   const handleExportCSV = () => {
     const headers = ['Order ID', 'Date', 'Customer', 'Email', 'Total', 'Status', 'Shipping'];
     const rows = filteredOrders.map(order => [
-      order.id,
+      order.order_number,
       order.created_at ? new Date(order.created_at).toLocaleDateString() : 'N/A',
-      order.customer_name || 'N/A',
-      order.customer_email || 'N/A',
+      order.customer?.name || 'N/A',
+      order.customer?.email || 'N/A',
       formatCurrency(order.total),
       order.status,
-      order.shipping_method || 'Standard'
+      formatCurrency(order.shipping)
     ]);
 
     const csvContent = [
@@ -192,12 +256,12 @@ const Orders: React.FC = () => {
                   ) : (
                     filteredOrders.map((order) => (
                       <tr key={order.id} className="hover:bg-slate-50/50 transition-colors group">
-                        <td className="px-6 py-4 text-sm font-bold text-indigo-600">{order.id}</td>
+                        <td className="px-6 py-4 text-sm font-bold text-indigo-600">{order.order_number}</td>
                         <td className="px-6 py-4 text-sm text-slate-500">
                           {order.created_at ? new Date(order.created_at).toLocaleDateString() : 'N/A'}
                         </td>
                         <td className="px-6 py-4">
-                          <span className="text-sm font-medium text-slate-900">{order.customer_name || 'N/A'}</span>
+                          <span className="text-sm font-medium text-slate-900">{order.customer?.name || 'N/A'}</span>
                         </td>
                         <td className="px-6 py-4 text-sm font-bold text-slate-900">{formatCurrency(order.total)}</td>
                         <td className="px-6 py-4">
@@ -275,8 +339,8 @@ const Orders: React.FC = () => {
           <div className="bg-white rounded-2xl shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto">
             <div className="sticky top-0 bg-white border-b border-slate-100 p-6 flex items-center justify-between">
               <div>
-                <h2 className="text-2xl font-serif text-slate-900">{selectedOrder.id}</h2>
-                <p className="text-sm text-slate-500 mt-1">{new Date(selectedOrder.created_at).toLocaleDateString()}</p>
+                <h2 className="text-2xl font-serif text-slate-900">{selectedOrder.orderNumber}</h2>
+                <p className="text-sm text-slate-500 mt-1">{selectedOrder.createdAt ? new Date(selectedOrder.createdAt).toLocaleDateString() : 'N/A'}</p>
               </div>
               <button 
                 onClick={closeDetailsModal}
@@ -293,15 +357,24 @@ const Orders: React.FC = () => {
                       <User size={16} />
                       <span className="text-[10px] font-bold uppercase tracking-widest">Customer</span>
                     </div>
-                    <p className="text-sm font-bold text-slate-900">{selectedOrder.customer_name || 'N/A'}</p>
-                    <p className="text-xs text-slate-500">{selectedOrder.customer_email || 'N/A'}</p>
+                    <p className="text-sm font-bold text-slate-900">{selectedOrder.customer?.name || 'N/A'}</p>
+                    <p className="text-xs text-slate-500">{selectedOrder.customer?.email || 'N/A'}</p>
                   </div>
                   <div>
                     <div className="flex items-center space-x-2 text-slate-500 mb-2">
                       <MapPin size={16} />
                       <span className="text-[10px] font-bold uppercase tracking-widest">Shipping Address</span>
                     </div>
-                    <p className="text-sm text-slate-900">{selectedOrder.shipping_address || 'N/A'}</p>
+                    {selectedOrder.shippingAddress ? (
+                      <div className="text-sm text-slate-900">
+                        <p>{selectedOrder.shippingAddress.name}</p>
+                        <p>{selectedOrder.shippingAddress.street}</p>
+                        <p>{selectedOrder.shippingAddress.city}, {selectedOrder.shippingAddress.state} {selectedOrder.shippingAddress.zip}</p>
+                        <p>{selectedOrder.shippingAddress.country}</p>
+                      </div>
+                    ) : (
+                      <p className="text-sm text-slate-900">N/A</p>
+                    )}
                   </div>
                 </div>
                 <div className="space-y-4">
@@ -310,14 +383,14 @@ const Orders: React.FC = () => {
                       <CreditCard size={16} />
                       <span className="text-[10px] font-bold uppercase tracking-widest">Payment Method</span>
                     </div>
-                    <p className="text-sm font-bold text-slate-900">{selectedOrder.payment_method || 'N/A'}</p>
+                    <p className="text-sm font-bold text-slate-900">{selectedOrder.payment?.method || 'N/A'}</p>
                   </div>
                   <div>
                     <div className="flex items-center space-x-2 text-slate-500 mb-2">
                       <Truck size={16} />
                       <span className="text-[10px] font-bold uppercase tracking-widest">Shipping Method</span>
                     </div>
-                    <p className="text-sm font-bold text-slate-900">{selectedOrder.shipping_method || 'Standard'}</p>
+                    <p className="text-sm font-bold text-slate-900">{selectedOrder.shipping?.method || 'Standard'}</p>
                   </div>
                   <div>
                     <span className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Status</span>
@@ -343,17 +416,16 @@ const Orders: React.FC = () => {
                 <h3 className="text-lg font-bold text-slate-900 mb-4">Order Items</h3>
                 <div className="space-y-3">
                   {selectedOrder.items && selectedOrder.items.length > 0 ? (
-                    selectedOrder.items.map((item: any, index: number) => (
+                    selectedOrder.items.map((item, index) => (
                       <div key={index} className="flex items-center justify-between p-4 bg-slate-50 rounded-xl">
                         <div>
-                          <p className="text-sm font-bold text-slate-900">{item.product_name || 'Product'}</p>
+                          <p className="text-sm font-bold text-slate-900">{item.productName || 'Product'}</p>
                           <div className="text-xs text-slate-500 space-y-0.5">
                             <p>Quantity: {item.quantity}</p>
                             {item.sku && <p>SKU: {item.sku}</p>}
-                            {item.color && item.size && <p>{item.color} / {item.size}</p>}
                           </div>
                         </div>
-                        <p className="text-sm font-bold text-slate-900">{formatCurrency((item.price || 0) * item.quantity)}</p>
+                        <p className="text-sm font-bold text-slate-900">{formatCurrency(item.price * item.quantity)}</p>
                       </div>
                     ))
                   ) : (

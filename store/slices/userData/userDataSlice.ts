@@ -3,6 +3,7 @@ import type { User, Order, Address, Product } from '@/types';
 
 export interface UserDataState {
   profile: User | null;
+  // kept for backward compatibility but no longer populated by /api/user-data
   orders: Order[];
   addresses: Address[];
   wishlist: Product[];
@@ -33,14 +34,14 @@ const userDataSlice = createSlice({
       state.error = null;
     },
     fetchUserDataSuccess: (state, action: PayloadAction<{
-      profile: User;
-      orders: Order[];
+      profile: User | null;
+      orders?: Order[];
       addresses: Address[];
       wishlist: Product[];
     }>) => {
       state.loading = false;
       state.profile = action.payload.profile;
-      state.orders = action.payload.orders;
+      state.orders = action.payload.orders || [];
       state.addresses = action.payload.addresses;
       state.wishlist = action.payload.wishlist;
       state.error = null;

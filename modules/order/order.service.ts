@@ -1,6 +1,6 @@
 import { NotFoundError, ValidationError } from '@/lib/errors';
 import { getAdminDbClient } from '@/lib/adminDb';
-import { findOrderById, createOrder as createOrderRepo, findOrdersAdmin, findOrderByIdAdmin, findOrdersByUserId, updateOrderStatusAdmin as updateOrderStatusAdminRepo } from './order.repository';
+import { findOrderById, createOrder as createOrderRepo, findOrdersAdmin, findOrderByIdAdmin, findOrdersByUserId, findOrdersByUserIdPaginated, updateOrderStatusAdmin as updateOrderStatusAdminRepo } from './order.repository';
 import type { CreateOrderRequest, OrderResponse, AdminOrderListQuery, AdminOrderListResponse } from './order.types';
 import type { OrderStatus } from '@/types';
 
@@ -20,6 +20,20 @@ export async function getOrder(id: string, userId?: string): Promise<OrderRespon
 
 export async function listOrders(userId: string, filters?: { status?: OrderStatus; limit?: number }): Promise<OrderResponse[]> {
   return await findOrdersByUserId(userId, filters);
+}
+
+export async function listOrdersPaginated(
+  userId: string,
+  filters: { status?: OrderStatus; page: number; limit: number }
+): Promise<{ orders: OrderResponse[]; total: number; totalPages: number }> {
+  const result = await findOrdersByUserIdPaginated(userId, filters);
+  const totalPages = Math.ceil(result.total / filters.limit);
+  
+  return {
+    orders: result.orders,
+    total: result.total,
+    totalPages,
+  };
 }
 
 export async function createOrder(

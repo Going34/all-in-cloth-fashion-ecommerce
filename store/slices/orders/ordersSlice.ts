@@ -14,25 +14,31 @@ export interface OrderFilters {
 export interface OrdersState {
   data: Order[];
   loading: boolean;
+  loadingMore: boolean;
   error: string | null;
   filters: OrderFilters;
+  historyCursor: string | null;
+  historyHasMore: boolean;
   pagination: {
     page: number;
     limit: number;
     total: number;
     totalPages: number;
   };
-  selectedOrder: any | null;
+  selectedOrder: Order | null;
 }
 
 const initialState: OrdersState = {
   data: [],
   loading: false,
+  loadingMore: false,
   error: null,
   filters: {
     page: 1,
     limit: 20,
   },
+  historyCursor: null,
+  historyHasMore: false,
   pagination: {
     page: 1,
     limit: 20,
@@ -67,7 +73,7 @@ const ordersSlice = createSlice({
       state.loading = true;
       state.error = null;
     },
-    fetchOrderByIdSuccess: (state, action: PayloadAction<any>) => {
+    fetchOrderByIdSuccess: (state, action: PayloadAction<Order | null>) => {
       state.loading = false;
       state.selectedOrder = action.payload;
       state.error = null;
@@ -80,11 +86,17 @@ const ordersSlice = createSlice({
       state.loading = true;
       state.error = null;
     },
-    updateOrderStatusSuccess: (state, action: PayloadAction<any>) => {
+    updateOrderStatusSuccess: (state, action: PayloadAction<unknown>) => {
+      const payload = action.payload as { id?: unknown; status?: unknown } | null;
+      const id = payload && typeof payload.id === 'string' ? payload.id : null;
+      const status = payload && typeof payload.status === 'string' ? (payload.status as OrderStatus) : null;
+
       state.loading = false;
-      state.data = state.data.map((o) => (o.id === action.payload.id ? { ...o, status: action.payload.status } : o));
-      if (state.selectedOrder?.id === action.payload.id) {
-        state.selectedOrder = action.payload;
+      if (id && status) {
+        state.data = state.data.map((o) => (o.id === id ? { ...o, status } : o));
+        if (state.selectedOrder?.id === id) {
+          state.selectedOrder = { ...state.selectedOrder, status };
+        }
       }
       state.error = null;
     },
@@ -94,28 +106,46 @@ const ordersSlice = createSlice({
     },
     fetchUserOrdersRequest: (state, action: PayloadAction<OrderFilters | undefined>) => {
       state.loading = true;
+      state.loadingMore = false;
       state.error = null;
+      state.historyCursor = null;
+      state.historyHasMore = false;
       if (action.payload) {
         state.filters = { ...state.filters, ...action.payload };
       }
     },
-    fetchUserOrdersSuccess: (state, action: PayloadAction<{ orders: Order[]; pagination?: OrdersState['pagination'] }>) => {
+    fetchUserOrdersSuccess: (state, action: PayloadAction<{ orders: Order[]; nextCursor: string | null; hasMore: boolean }>) => {
       state.loading = false;
       state.data = action.payload.orders;
-      if (action.payload.pagination) {
-        state.pagination = action.payload.pagination;
-      }
+      state.historyCursor = action.payload.nextCursor;
+      state.historyHasMore = action.payload.hasMore;
       state.error = null;
     },
     fetchUserOrdersFailure: (state, action: PayloadAction<string>) => {
       state.loading = false;
+      state.loadingMore = false;
+      state.error = action.payload;
+    },
+    fetchUserOrdersNextPageRequest: (state) => {
+      state.loadingMore = true;
+      state.error = null;
+    },
+    fetchUserOrdersNextPageSuccess: (state, action: PayloadAction<{ orders: Order[]; nextCursor: string | null; hasMore: boolean }>) => {
+      state.loadingMore = false;
+      state.data = [...state.data, ...action.payload.orders];
+      state.historyCursor = action.payload.nextCursor;
+      state.historyHasMore = action.payload.hasMore;
+      state.error = null;
+    },
+    fetchUserOrdersNextPageFailure: (state, action: PayloadAction<string>) => {
+      state.loadingMore = false;
       state.error = action.payload;
     },
     fetchUserOrderByIdRequest: (state, action: PayloadAction<string>) => {
       state.loading = true;
       state.error = null;
     },
-    fetchUserOrderByIdSuccess: (state, action: PayloadAction<any>) => {
+    fetchUserOrderByIdSuccess: (state, action: PayloadAction<Order | null>) => {
       state.loading = false;
       state.selectedOrder = action.payload;
       state.error = null;
@@ -124,7 +154,7 @@ const ordersSlice = createSlice({
       state.loading = false;
       state.error = action.payload;
     },
-    createUserOrderRequest: (state, action: PayloadAction<any>) => {
+    createUserOrderRequest: (state) => {
       state.loading = true;
       state.error = null;
     },
