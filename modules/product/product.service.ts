@@ -44,8 +44,8 @@ export async function getProduct(id: string): Promise<ProductResponse> {
   return product;
 }
 
-export async function createProduct(data: CreateProductRequest): Promise<ProductResponse> {
-  return await createProductRepo(data);
+export async function createProduct(data: CreateProductRequest, idempotencyKey?: string): Promise<ProductResponse> {
+  return await createProductRepo(data, idempotencyKey);
 }
 
 export async function listProductsAdmin(query: AdminProductListQuery): Promise<AdminProductListResponse> {
@@ -54,6 +54,8 @@ export async function listProductsAdmin(query: AdminProductListQuery): Promise<A
 
   const result = await findProductsAdmin({
     page,
+    cursor: query.cursor,
+    direction: query.direction,
     limit,
     search: query.search,
     category: query.category,
@@ -70,6 +72,9 @@ export async function listProductsAdmin(query: AdminProductListQuery): Promise<A
       limit,
       total: result.total,
       totalPages,
+      nextCursor: result.nextCursor,
+      prevCursor: result.prevCursor,
+      hasMore: result.hasMore,
     },
   };
 }

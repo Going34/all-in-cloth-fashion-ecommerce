@@ -15,6 +15,8 @@ export async function GET(request: NextRequest) {
       category: searchParams.get('category') || undefined,
       status: searchParams.get('status') || undefined,
       sort: searchParams.get('sort') || undefined,
+      cursor: searchParams.get('cursor') || undefined,
+      direction: searchParams.get('direction') || undefined,
     });
 
     const result = await listProductsAdmin(query);
@@ -29,8 +31,9 @@ export async function POST(request: NextRequest) {
     await requireAdmin();
     const body = await request.json();
     const productData = validateCreateProductRequest(body);
+    const idempotencyKey = request.headers.get('idempotency-key') || undefined;
 
-    const product = await createProduct(productData);
+    const product = await createProduct(productData, idempotencyKey);
 
     return successResponse(product, 201);
   } catch (error) {

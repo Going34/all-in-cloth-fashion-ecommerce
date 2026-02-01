@@ -615,22 +615,43 @@ const ProductForm: React.FC<ProductFormProps> = ({ productId }) => {
   };
 
   const handleVariantSave = () => {
-    if (!variantForm.color || !variantForm.size) {
-      alert('Please fill in color and size');
+    if (!variantForm.color) {
+      alert('Please fill in color');
       return;
     }
 
-    const sku = variantForm.sku || generateSKU(formData.name, variantForm.color, variantForm.size);
+    if (parseInt(variantForm.stock) < 0) {
+      alert('Stock cannot be negative');
+      return;
+    }
+
+    // If size is empty, default to "One Size" for non-clothing items
+    const finalSize = variantForm.size.trim() || 'One Size';
+
+    // Check for duplicates (case-insensitive)
+    const duplicate = variants.find(v => 
+      v.color.toLowerCase() === variantForm.color.trim().toLowerCase() && 
+      v.size.toLowerCase() === finalSize.toLowerCase() &&
+      v.id !== editingVariant?.id
+    );
+    
+    if (duplicate) {
+      alert('A variant with this color and size already exists');
+      return;
+    }
+
+    const sku = variantForm.sku || generateSKU(formData.name, variantForm.color, finalSize);
 
     if (editingVariant) {
       setVariants(variants.map(v => 
         v.id === editingVariant.id 
-          ? { ...variantForm, sku, id: editingVariant.id }
+          ? { ...variantForm, size: finalSize, sku, id: editingVariant.id }
           : v
       ));
     } else {
       const newVariant: VariantFormData = {
         ...variantForm,
+        size: finalSize,
         id: `var-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
         sku,
       };
@@ -1356,14 +1377,14 @@ const ProductForm: React.FC<ProductFormProps> = ({ productId }) => {
                 </div>
                 <div className="space-y-2">
                   <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
-                    Size <span className="text-red-500">*</span>
+                    Size
                   </label>
                   <input
                     type="text"
                     value={variantForm.size}
                     onChange={(e) => setVariantForm({ ...variantForm, size: e.target.value.toUpperCase() })}
                     className="w-full bg-slate-50 border-none rounded-xl py-3 px-4 focus:ring-2 focus:ring-indigo-500 outline-none"
-                    placeholder="e.g., M"
+                    placeholder="e.g., M (Defaults to 'One Size')"
                   />
                 </div>
               </div>

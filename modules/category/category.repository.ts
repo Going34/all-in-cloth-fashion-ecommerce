@@ -1,4 +1,5 @@
 import { getDbClient } from '@/lib/db';
+import { getAdminDbClient } from '@/lib/adminDb';
 import type { CategoryResponse } from './category.types';
 
 export async function findAllCategories(): Promise<CategoryResponse[]> {
@@ -26,7 +27,8 @@ export async function createCategory(
   name: string,
   parentId: string | null = null
 ): Promise<CategoryResponse> {
-  const supabase = await getDbClient();
+  // Use admin client to bypass RLS for creation (auth check handled in service/controller)
+  const supabase = getAdminDbClient();
 
   // Insert category and select only the specific columns we need to avoid ambiguity
   // Specifying columns explicitly prevents "user_id is ambiguous" error from RLS policies
