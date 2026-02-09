@@ -1,7 +1,6 @@
 import { NextRequest } from 'next/server';
 import { successResponse, errorResponse } from '@/lib/response';
 import { requireAdmin } from '@/lib/auth';
-import { ForbiddenError } from '@/lib/errors';
 import { getProduct, updateProductAdmin, deleteProductAdmin } from '@/modules/product/product.service';
 import { validateUpdateProductRequest } from '@/modules/product/product.validators';
 
@@ -40,13 +39,7 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const user = await requireAdmin();
-
-    // Critical Security Check: Only OPS role can delete products
-    if (!user.roles?.includes('OPS') && !user.roles?.includes('SUPER_ADMIN')) {
-      throw new ForbiddenError('Only OPS role can delete products');
-    }
-
+    await requireAdmin();
     const { id } = await params;
     await deleteProductAdmin(id);
     return successResponse({ message: 'Product deleted successfully' });

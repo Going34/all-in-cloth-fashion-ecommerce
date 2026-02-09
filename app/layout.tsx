@@ -21,6 +21,9 @@ const playfairDisplay = Playfair_Display({
 export const metadata: Metadata = {
   title: "All in cloth | Modern Fashion",
   description: "Redefining modern luxury through architectural silhouettes and ethical craftsmanship.",
+  icons: {
+    icon: '/logo.png',
+  },
 };
 
 export default function RootLayout({
@@ -30,7 +33,9 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
+       <link rel="icon" type="image/x-icon" href="logo.png" />
       <body className={`${inter.variable} ${playfairDisplay.variable} antialiased bg-white text-neutral-900`}>
+
         <Providers>
           <StorefrontLayout>
             {children}

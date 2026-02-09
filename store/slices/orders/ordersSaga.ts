@@ -2,6 +2,7 @@ import { call, put, takeEvery, takeLatest, select } from 'redux-saga/effects';
 import { apiClient } from '../../api/client';
 import { apiInterceptor } from '../../api/interceptor';
 import { ordersActions } from './ordersSlice';
+import { toastActions } from '../toast/toastSlice';
 import type { RootState } from '../../types';
 import type { AxiosError, AxiosResponse } from 'axios';
 import type { Order } from '@/types';
@@ -77,15 +78,17 @@ function* updateOrderStatusSaga(action: ReturnType<typeof ordersActions.updateOr
       },
     };
 
-    const interceptedConfig = apiInterceptor.request(config);
-    const response = (yield call(apiClient.request, interceptedConfig)) as AxiosResponse;
-    const transformedData = apiInterceptor.response(response) as unknown;
+	    const interceptedConfig = apiInterceptor.request(config);
+	    const response = (yield call(apiClient.request, interceptedConfig)) as AxiosResponse;
+	    const transformedData = apiInterceptor.response(response) as unknown;
 
-    yield put(ordersActions.updateOrderStatusSuccess(transformedData));
-  } catch (error: unknown) {
-    const processedError = apiInterceptor.error(error as unknown as AxiosError<ApiResponse>);
-    yield put(ordersActions.updateOrderStatusFailure(processedError.message));
-  }
+	    yield put(ordersActions.updateOrderStatusSuccess(transformedData));
+	    yield put(toastActions.showToast('Order status updated successfully', 'success'));
+	  } catch (error: unknown) {
+	    const processedError = apiInterceptor.error(error as unknown as AxiosError<ApiResponse>);
+	    yield put(ordersActions.updateOrderStatusFailure(processedError.message));
+	    yield put(toastActions.showToast(processedError.message || 'Failed to update order status', 'error'));
+	  }
 }
 
 function* fetchUserOrdersSaga(action: ReturnType<typeof ordersActions.fetchUserOrdersRequest>): Generator<unknown, void, unknown> {

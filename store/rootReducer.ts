@@ -13,6 +13,7 @@ import wishlistReducer from './slices/wishlist/wishlistSlice';
 import addressesReducer from './slices/addresses/addressesSlice';
 import profileReducer from './slices/profile/profileSlice';
 import userDataReducer from './slices/userData/userDataSlice';
+import toastReducer from './slices/toast/toastSlice';
 
 const rootReducer = combineReducers({
   auth: authReducer,
@@ -28,7 +29,8 @@ const rootReducer = combineReducers({
   wishlist: wishlistReducer,
   addresses: addressesReducer,
   profile: profileReducer,
-  userData: userDataReducer,
+	  userData: userDataReducer,
+	  toast: toastReducer,
 });
 
 export default rootReducer;

@@ -3,14 +3,14 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { ordersActions } from '@/store/slices/orders/ordersSlice';
-import { 
-  selectOrders, 
-  selectOrdersLoading, 
+import {
+  selectOrders,
+  selectOrdersLoading,
   selectOrdersError,
   selectOrdersPagination,
   selectSelectedOrder
 } from '@/store/slices/orders/ordersSelectors';
-import { Search, Filter, Download, FileText, X, Package, Truck, CheckCircle2, User, MapPin, CreditCard, Loader2 } from 'lucide-react';
+import { Search, Download, FileText, X, Truck, User, MapPin, CreditCard, Loader2 } from 'lucide-react';
 import { OrderStatus } from '../../types';
 import { formatCurrency } from '../../utils/currency';
 
@@ -79,6 +79,10 @@ interface AdminOrderDetail {
   total: number;
   createdAt: string;
   updatedAt: string;
+  paymentMode?: string;
+  advancePayment?: number;
+  remainingBalance?: number;
+  isPartialPayment?: boolean;
 }
 
 const Orders: React.FC = () => {
@@ -88,7 +92,7 @@ const Orders: React.FC = () => {
   const error = useAppSelector(selectOrdersError);
   const pagination = useAppSelector(selectOrdersPagination);
   const rawSelectedOrder = useAppSelector(selectSelectedOrder);
-  
+
   const orders = rawOrders as unknown as AdminOrderListItem[];
   const selectedOrder = rawSelectedOrder as unknown as AdminOrderDetail | null;
 
@@ -98,10 +102,10 @@ const Orders: React.FC = () => {
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
 
   useEffect(() => {
-    dispatch(ordersActions.fetchOrdersDataRequest({ 
-      page: pagination.page, 
+    dispatch(ordersActions.fetchOrdersDataRequest({
+      page: pagination.page,
       limit: pagination.limit,
-      status: activeTab !== 'All' ? activeTab as OrderStatus : undefined,
+      status: activeTab !== 'All' ? (activeTab as OrderStatus) : undefined,
       search: searchTerm || undefined,
     }));
   }, [dispatch, pagination.page, pagination.limit, activeTab, searchTerm]);
@@ -123,7 +127,7 @@ const Orders: React.FC = () => {
 
     if (searchTerm) {
       const lowerTerm = searchTerm.toLowerCase();
-      filtered = filtered.filter(order => 
+      filtered = filtered.filter(order =>
         order.order_number.toLowerCase().includes(lowerTerm) ||
         (order.customer?.name && order.customer.name.toLowerCase().includes(lowerTerm)) ||
         (order.customer?.email && order.customer.email.toLowerCase().includes(lowerTerm))
@@ -180,7 +184,7 @@ const Orders: React.FC = () => {
           <h1 className="text-3xl font-serif text-slate-900">Orders</h1>
           <p className="text-slate-500 mt-1">Manage fulfillment and track payment status.</p>
         </div>
-        <button 
+        <button
           onClick={handleExportCSV}
           className="bg-slate-900 text-white px-6 py-3 rounded-xl font-bold flex items-center justify-center space-x-2 hover:bg-slate-800 transition-all shadow-lg"
         >
@@ -202,11 +206,10 @@ const Orders: React.FC = () => {
             onClick={() => {
               setActiveTab(tab);
             }}
-            className={`px-6 py-3 rounded-xl text-sm font-bold whitespace-nowrap transition-all ${
-              activeTab === tab 
-                ? 'bg-indigo-600 text-white shadow-md' 
-                : 'text-slate-500 hover:bg-slate-50'
-            }`}
+            className={`px-6 py-3 rounded-xl text-sm font-bold whitespace-nowrap transition-all ${activeTab === tab
+              ? 'bg-indigo-600 text-white shadow-md'
+              : 'text-slate-500 hover:bg-slate-50'
+              }`}
           >
             {tab} {activeTab === tab && `(${filteredOrders.length})`}
           </button>
@@ -216,8 +219,8 @@ const Orders: React.FC = () => {
       <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-          <input 
-            type="text" 
+          <input
+            type="text"
             placeholder="Search by Order ID or customer name..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
@@ -265,13 +268,12 @@ const Orders: React.FC = () => {
                         </td>
                         <td className="px-6 py-4 text-sm font-bold text-slate-900">{formatCurrency(order.total)}</td>
                         <td className="px-6 py-4">
-                          <span className={`px-2 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest ${
-                            order.status === 'paid' ? 'bg-green-100 text-green-700' : 
-                            order.status === 'pending' ? 'bg-orange-100 text-orange-700' : 
-                            order.status === 'shipped' ? 'bg-blue-100 text-blue-700' :
-                            order.status === 'delivered' ? 'bg-indigo-100 text-indigo-700' :
-                            order.status === 'cancelled' ? 'bg-red-100 text-red-700' : 'bg-slate-100 text-slate-700'
-                          }`}>
+                          <span className={`px-2 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest ${order.status === 'paid' ? 'bg-green-100 text-green-700' :
+                            order.status === 'pending' ? 'bg-orange-100 text-orange-700' :
+                              order.status === 'shipped' ? 'bg-blue-100 text-blue-700' :
+                                order.status === 'delivered' ? 'bg-indigo-100 text-indigo-700' :
+                                  order.status === 'cancelled' ? 'bg-red-100 text-red-700' : 'bg-slate-100 text-slate-700'
+                            }`}>
                             {order.status}
                           </span>
                         </td>
@@ -282,7 +284,7 @@ const Orders: React.FC = () => {
                         </td>
                         <td className="px-6 py-4 text-right">
                           <div className="flex items-center justify-end space-x-2">
-                            <button 
+                            <button
                               onClick={() => openDetailsModal(order.id)}
                               className="text-xs font-bold uppercase tracking-widest text-indigo-600 hover:underline underline-offset-4"
                             >
@@ -302,9 +304,9 @@ const Orders: React.FC = () => {
                   Showing {((pagination.page - 1) * pagination.limit) + 1} to {Math.min(pagination.page * pagination.limit, pagination.total)} of {pagination.total} orders
                 </p>
                 <div className="flex space-x-2">
-                  <button 
-                    onClick={() => dispatch(ordersActions.fetchOrdersDataRequest({ 
-                      page: pagination.page - 1, 
+                  <button
+                    onClick={() => dispatch(ordersActions.fetchOrdersDataRequest({
+                      page: pagination.page - 1,
                       limit: pagination.limit,
                       status: activeTab !== 'All' ? activeTab as OrderStatus : undefined,
                       search: searchTerm || undefined,
@@ -314,9 +316,9 @@ const Orders: React.FC = () => {
                   >
                     Previous
                   </button>
-                  <button 
-                    onClick={() => dispatch(ordersActions.fetchOrdersDataRequest({ 
-                      page: pagination.page + 1, 
+                  <button
+                    onClick={() => dispatch(ordersActions.fetchOrdersDataRequest({
+                      page: pagination.page + 1,
                       limit: pagination.limit,
                       status: activeTab !== 'All' ? activeTab as OrderStatus : undefined,
                       search: searchTerm || undefined,
@@ -342,7 +344,7 @@ const Orders: React.FC = () => {
                 <h2 className="text-2xl font-serif text-slate-900">{selectedOrder.orderNumber}</h2>
                 <p className="text-sm text-slate-500 mt-1">{selectedOrder.createdAt ? new Date(selectedOrder.createdAt).toLocaleDateString() : 'N/A'}</p>
               </div>
-              <button 
+              <button
                 onClick={closeDetailsModal}
                 className="p-2 text-slate-400 hover:text-slate-900 hover:bg-slate-100 rounded-lg"
               >
@@ -384,6 +386,11 @@ const Orders: React.FC = () => {
                       <span className="text-[10px] font-bold uppercase tracking-widest">Payment Method</span>
                     </div>
                     <p className="text-sm font-bold text-slate-900">{selectedOrder.payment?.method || 'N/A'}</p>
+                    {selectedOrder.paymentMode === 'PARTIAL_COD' && (
+                      <span className="inline-block mt-1 px-2 py-0.5 bg-yellow-100 text-yellow-800 text-[10px] font-bold uppercase tracking-widest rounded-full">
+                        Partial COD
+                      </span>
+                    )}
                   </div>
                   <div>
                     <div className="flex items-center space-x-2 text-slate-500 mb-2">
@@ -395,7 +402,7 @@ const Orders: React.FC = () => {
                   <div>
                     <span className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Status</span>
                     <div className="mt-2">
-                      <select 
+                      <select
                         value={selectedOrder.status}
                         onChange={(e) => handleStatusUpdate(selectedOrder.id, e.target.value as OrderStatus)}
                         disabled={loading}
@@ -436,6 +443,18 @@ const Orders: React.FC = () => {
                   <span className="text-lg font-bold text-slate-900">Total</span>
                   <span className="text-2xl font-serif text-slate-900">{formatCurrency(selectedOrder.total)}</span>
                 </div>
+                {selectedOrder.paymentMode === 'PARTIAL_COD' && (
+                  <div className="mt-2 space-y-1 bg-slate-50 p-3 rounded-lg text-sm">
+                    <div className="flex justify-between text-green-700">
+                      <span>Advance Paid:</span>
+                      <span className="font-bold">{formatCurrency(selectedOrder.advancePayment || 0)}</span>
+                    </div>
+                    <div className="flex justify-between text-red-700">
+                      <span>Due on Delivery:</span>
+                      <span className="font-bold">{formatCurrency(selectedOrder.remainingBalance || 0)}</span>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           </div>

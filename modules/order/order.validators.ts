@@ -38,7 +38,10 @@ export function validateCreateOrderRequest(body: unknown): CreateOrderRequest {
     errors.address_id = 'Address ID is required';
   }
 
-  if (data.coupon_code !== undefined && typeof data.coupon_code !== 'string') {
+  if (data.promo_code !== undefined && typeof data.promo_code !== 'string') {
+    errors.promo_code = 'Promo code must be a string';
+  } else if (data.coupon_code !== undefined && typeof data.coupon_code !== 'string') {
+    // Check legacy specific field if promo_code is missing
     errors.coupon_code = 'Coupon code must be a string';
   }
 
@@ -49,7 +52,8 @@ export function validateCreateOrderRequest(body: unknown): CreateOrderRequest {
   return {
     items: data.items as CreateOrderRequest['items'],
     address_id: data.address_id as string,
-    coupon_code: data.coupon_code as string | undefined,
+    promo_code: (data.promo_code || data.coupon_code) as string | undefined,
+    payment_mode: (data.payment_mode as 'PREPAID' | 'COD' | 'PARTIAL_COD') || 'PREPAID',
   };
 }
 

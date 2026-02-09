@@ -12,7 +12,7 @@ export async function validateCoupon(code: string): Promise<{
     .from('coupons')
     .select('*')
     .eq('code', code.toUpperCase())
-    .single();
+    .maybeSingle();
 
   if (error || !data) {
     return { valid: false, error: 'Invalid coupon code' };
@@ -20,9 +20,21 @@ export async function validateCoupon(code: string): Promise<{
 
   const coupon = data as Coupon;
 
+  if (!coupon.is_active) {
+    return { valid: false, error: 'Coupon is inactive' };
+  }
+
   // Check expiration
-  if (coupon.expires_at && new Date(coupon.expires_at) < new Date()) {
+  if (coupon.valid_till && new Date(coupon.valid_till) < new Date()) {
     return { valid: false, error: 'Coupon has expired' };
+  }
+
+  if (coupon.valid_from && new Date(coupon.valid_from) > new Date()) {
+    return { valid: false, error: 'Coupon is not yet valid' };
+  }
+
+  if (coupon.usage_limit && coupon.used_count >= coupon.usage_limit) {
+    return { valid: false, error: 'Coupon usage limit reached' };
   }
 
   return { valid: true, coupon };
@@ -32,12 +44,20 @@ export async function calculateDiscount(
   coupon: Coupon,
   subtotal: number
 ): Promise<number> {
+  let discount = 0;
+
   if (coupon.type === 'flat') {
-    return Math.min(coupon.value, subtotal);
+    discount = Math.min(coupon.value, subtotal);
+  } else {
+    // percent
+    discount = (subtotal * coupon.value) / 100;
   }
 
-  // percent
-  return (subtotal * coupon.value) / 100;
+  if (coupon.max_discount) {
+    discount = Math.min(discount, coupon.max_discount);
+  }
+
+  return discount;
 }
 
 export async function applyCouponToOrder(
@@ -70,7 +90,11 @@ export async function createCoupon(coupon: {
   code: string;
   type: CouponType;
   value: number;
-  expires_at?: string | null;
+  valid_till?: string | null;
+  min_order_amount?: number;
+  max_discount?: number | null;
+  usage_limit?: number | null;
+  is_active?: boolean;
 }): Promise<{ data: Coupon | null; error: Error | null }> {
   const { data, error } = await supabase
     .from('coupons')
@@ -78,7 +102,12 @@ export async function createCoupon(coupon: {
       code: coupon.code.toUpperCase(),
       type: coupon.type,
       value: coupon.value,
-      expires_at: coupon.expires_at,
+      valid_till: coupon.valid_till,
+      min_order_amount: coupon.min_order_amount || 0,
+      max_discount: coupon.max_discount,
+      usage_limit: coupon.usage_limit,
+      is_active: coupon.is_active ?? true,
+      used_count: 0
     } as any)
     .select()
     .single();
@@ -90,16 +119,17 @@ export async function updateCoupon(
   id: string,
   updates: Partial<Omit<Coupon, 'id' | 'created_at'>>
 ): Promise<{ error: Error | null }> {
-  const updateData: Record<string, unknown> = {};
-  
-  if (updates.code !== undefined) updateData.code = updates.code.toUpperCase();
-  if (updates.type !== undefined) updateData.type = updates.type;
-  if (updates.value !== undefined) updateData.value = updates.value;
-  if (updates.expires_at !== undefined) updateData.expires_at = updates.expires_at;
+  // Use a type that matches the actual DB columns/Coupon interface partial
+  const updateData: any = { ...updates };
+
+  // Ensure uppercase code if present
+  if (updateData.code) {
+    updateData.code = updateData.code.toUpperCase();
+  }
 
   const { error } = await supabase
     .from('coupons')
-    .update(updateData as any)
+    .update(updateData)
     .eq('id', id);
 
   return { error: error as Error | null };
@@ -114,19 +144,22 @@ export async function getCouponUsageStats(couponId: string): Promise<{
   totalUsed: number;
   totalDiscount: number;
 }> {
+  // Logic updated to check coupons.used_count directly? 
+  // Or keep relying on order_coupons relation if that's still filled?
+  // Let's rely on the coupon object itself for count
+
   const { data, error } = await supabase
-    .from('order_coupons')
-    .select(`
-      orders (total)
-    `)
-    .eq('coupon_id', couponId);
+    .from('coupons')
+    .select('used_count')
+    .eq('id', couponId)
+    .single();
 
   if (error || !data) {
     return { totalUsed: 0, totalDiscount: 0 };
   }
 
   return {
-    totalUsed: data.length,
-    totalDiscount: 0, // Would need to calculate based on actual discount applied
+    totalUsed: data.used_count,
+    totalDiscount: 0, // Still placeholder as we'd need to sum promo_usage_logs for accurate total
   };
 }

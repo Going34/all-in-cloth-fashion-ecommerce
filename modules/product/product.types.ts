@@ -47,11 +47,6 @@ export interface CreateProductRequest {
   variants?: CreateProductVariantRequest[];
   images?: string[];
   primaryImageIndex?: number;
-  slug?: string;
-  meta_title?: string;
-  meta_description?: string;
-  tags?: string[];
-  scheduled_publish_at?: string;
 }
 
 export interface CreateProductVariantRequest {
@@ -64,7 +59,6 @@ export interface CreateProductVariantRequest {
   images?: string[];
   stock?: number;
   low_stock_threshold?: number;
-  attributes?: Record<string, unknown>;
 }
 
 export interface UpdateProductRequest {
@@ -77,19 +71,12 @@ export interface UpdateProductRequest {
   variants?: CreateProductVariantRequest[];
   images?: string[];
   primaryImageIndex?: number;
-  slug?: string;
-  meta_title?: string;
-  meta_description?: string;
-  tags?: string[];
-  scheduled_publish_at?: string;
 }
 
-export type ProductResponse = ProductWithDetails;
+export interface ProductResponse extends ProductWithDetails {}
 
 export interface AdminProductListQuery {
   page?: number;
-  cursor?: string;
-  direction?: 'next' | 'prev';
   limit?: number;
   search?: string;
   category?: string;
@@ -119,9 +106,6 @@ export interface AdminProductListResponse {
     limit: number;
     total: number;
     totalPages: number;
-    nextCursor?: string | null;
-    prevCursor?: string | null;
-    hasMore?: boolean;
   };
 }
 

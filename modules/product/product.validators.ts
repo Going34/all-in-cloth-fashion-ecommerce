@@ -112,8 +112,6 @@ export function validateCreateProductRequest(body: unknown): CreateProductReques
 export function validateAdminProductListQuery(query: Record<string, string | undefined>): AdminProductListQuery {
   const page = query.page ? parseInt(query.page, 10) : undefined;
   const limit = query.limit ? parseInt(query.limit, 10) : undefined;
-  const cursor = query.cursor;
-  const direction = query.direction === 'prev' ? 'prev' : 'next';
 
   if (page !== undefined && (page < 1 || isNaN(page))) {
     throw new ValidationError('Page must be a positive integer', { page: 'Invalid page value' });
@@ -134,8 +132,6 @@ export function validateAdminProductListQuery(query: Record<string, string | und
 
   return {
     page: page || 1,
-    cursor,
-    direction,
     limit: limit || 10,
     search: query.search,
     category: query.category,

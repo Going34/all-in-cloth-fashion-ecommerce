@@ -1,4 +1,4 @@
-import type { Order, OrderItem, OrderStatus, OrderStatusHistory, Payment } from '@/types';
+import type { Order, OrderItem, OrderStatus, OrderStatusHistory, Payment, Address } from '@/types';
 
 export interface CreateOrderRequest {
   items: Array<{
@@ -6,13 +6,25 @@ export interface CreateOrderRequest {
     quantity: number;
   }>;
   address_id: string;
-  coupon_code?: string;
+  promo_code?: string;
+  coupon_code?: string; // Legacy support or alias
+  payment_mode?: 'PREPAID' | 'COD' | 'PARTIAL_COD';
+}
+
+
+export interface EnrichedOrderItem extends OrderItem {
+  image_url?: string;
+  color?: string;
+  size?: string;
+  product_slug?: string;
+  product_id?: string;
 }
 
 export interface OrderResponse extends Order {
-  items: OrderItem[];
+  items: EnrichedOrderItem[];
   status_history?: OrderStatusHistory[];
   payment?: Payment | null;
+  shipping_address?: Address | null;
 }
 
 export interface OrderListQuery {

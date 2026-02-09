@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useCart } from '../../context/CartContext';
+import { PromoCodeInput } from '../../components/cart/PromoCodeInput';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import { selectOrdersLoading, selectOrdersError, selectSelectedOrder } from '../../store/slices/orders/ordersSelectors';
 import { addressesActions } from '../../store/slices/addresses/addressesSlice';
@@ -23,7 +24,7 @@ declare global {
 }
 
 function CheckoutContent() {
-  const { cart, totalPrice, clearCart } = useCart();
+  const { cart, totalPrice, clearCart, subtotal, discountAmount, finalTotal, promoCode } = useCart();
   const router = useRouter();
   const dispatch = useAppDispatch();
   const loading = useAppSelector(selectOrdersLoading);
@@ -56,10 +57,18 @@ function CheckoutContent() {
   const orderIdRef = useRef<string | null>(null);
   const paymentCompletedRef = useRef(false);
   const cancelRequestedRef = useRef(false);
+  const [paymentMode, setPaymentMode] = useState<'PREPAID' | 'PARTIAL_COD'>('PREPAID');
+  const advanceAmount = 70;
 
   const shipping = 15;
-  const tax = totalPrice * 0.08;
-  const grandTotal = totalPrice + shipping + tax;
+  // Calculate tax on the discounted total
+  // IMPORTANT: Tax rate must match backend (10% in order.repository.ts)
+  const taxableAmount = Math.max(0, subtotal - discountAmount);
+  const tax = taxableAmount * 0.1; // 10% tax rate (matches backend)
+  const grandTotal = taxableAmount + shipping + tax;
+
+  const paymentAmount = paymentMode === 'PARTIAL_COD' ? advanceAmount : grandTotal;
+  const remainingAmount = paymentMode === 'PARTIAL_COD' ? grandTotal - advanceAmount : 0;
 
   const getDeliveryDateRange = (includeYear = true) => {
     const today = new Date();
@@ -70,13 +79,13 @@ function CheckoutContent() {
 
     const options: Intl.DateTimeFormatOptions = { month: 'short', day: 'numeric' };
     const startStr = start.toLocaleDateString('en-US', options);
-    
+
     if (includeYear) {
-        const endStr = end.toLocaleDateString('en-US', { ...options, year: 'numeric' });
-        return `${startStr} - ${endStr}`;
+      const endStr = end.toLocaleDateString('en-US', { ...options, year: 'numeric' });
+      return `${startStr} - ${endStr}`;
     } else {
-        const endStr = end.toLocaleDateString('en-US', options);
-        return `${startStr} - ${endStr}`;
+      const endStr = end.toLocaleDateString('en-US', options);
+      return `${startStr} - ${endStr}`;
     }
   };
 
@@ -131,7 +140,7 @@ function CheckoutContent() {
 
   const validateNewAddressForm = (): boolean => {
     const errors: Record<string, string> = {};
-    
+
     if (!newAddressForm.name.trim()) {
       errors.name = 'Name is required';
     }
@@ -160,12 +169,12 @@ function CheckoutContent() {
 
   useEffect(() => {
     if (isCreatingAddress && addresses.length > 0) {
-      const newlyCreatedAddress = addresses.find(addr => 
-        addr.name === newAddressForm.name && 
+      const newlyCreatedAddress = addresses.find(addr =>
+        addr.name === newAddressForm.name &&
         addr.street === newAddressForm.street &&
         addr.city === newAddressForm.city
       );
-      
+
       if (newlyCreatedAddress) {
         setSelectedAddressId(newlyCreatedAddress.id);
         setUseNewAddress(false);
@@ -207,7 +216,7 @@ function CheckoutContent() {
       if (!validateNewAddressForm()) {
         return;
       }
-      
+
       alert('Please save the address first by clicking "Save Address" button, then place your order.');
       return;
     } else {
@@ -242,6 +251,8 @@ function CheckoutContent() {
           items: orderItems,
           address_id: addressIdToUse,
           shipping: shipping,
+          promo_code: promoCode || undefined, // Send promo code if applied
+          payment_mode: paymentMode,
         }),
       });
 
@@ -263,6 +274,10 @@ function CheckoutContent() {
         },
         body: JSON.stringify({
           order_id: order.id,
+          // Send payment mode and advance amount so backend can
+          // correctly charge only the advance for Partial COD
+          payment_mode: paymentMode,
+          advance_amount: paymentMode === 'PARTIAL_COD' ? advanceAmount : undefined,
         }),
       });
 
@@ -308,7 +323,7 @@ function CheckoutContent() {
             }
 
             const verifyData = await verifyResponse.json();
-            
+
             if (verifyData.data.success) {
               paymentCompletedRef.current = true;
               if (!redirectStarted.current) {
@@ -342,7 +357,7 @@ function CheckoutContent() {
           color: '#000000',
         },
         modal: {
-          ondismiss: function() {
+          ondismiss: function () {
             setIsProcessingPayment(false);
             setPaymentError('Payment was cancelled');
             const orderId = orderIdRef.current;
@@ -350,7 +365,7 @@ function CheckoutContent() {
               return;
             }
             cancelRequestedRef.current = true;
-            fetch(`/api/orders/${orderId}/cancel`, { method: 'POST' }).catch(() => {});
+            fetch(`/api/orders/${orderId}/cancel`, { method: 'POST' }).catch(() => { });
           },
         },
       };
@@ -378,6 +393,12 @@ function CheckoutContent() {
             <div className="flex justify-between py-1 text-neutral-600">
               <span>Order Number:</span>
               <span>{createdOrder.order_number || 'N/A'}</span>
+            </div>
+          )}
+          {createdOrder && createdOrder.payment_mode === 'PARTIAL_COD' && (
+            <div className="flex justify-between py-1 text-neutral-600 font-medium bg-yellow-50 p-2 rounded mt-2">
+              <span>Remaining Amount (Pay on Delivery):</span>
+              <span>{formatCurrency(createdOrder.remaining_balance || 0)}</span>
             </div>
           )}
           <div className="flex justify-between py-1 text-neutral-600">
@@ -416,8 +437,8 @@ function CheckoutContent() {
                 <div className="bg-neutral-900 text-white w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold">1</div>
                 <h2 className="text-xl font-medium">Shipping Address</h2>
               </div>
-              <Link 
-                href="/addresses" 
+              <Link
+                href="/addresses"
                 className="text-sm text-neutral-600 hover:text-neutral-900 underline"
               >
                 Manage Addresses
@@ -447,11 +468,10 @@ function CheckoutContent() {
                           setSelectedAddressId(address.id);
                           setUseNewAddress(false);
                         }}
-                        className={`p-4 border rounded-lg cursor-pointer transition-all ${
-                          selectedAddressId === address.id
-                            ? 'border-neutral-900 bg-neutral-50'
-                            : 'border-neutral-200 hover:border-neutral-400'
-                        }`}
+                        className={`p-4 border rounded-lg cursor-pointer transition-all ${selectedAddressId === address.id
+                          ? 'border-neutral-900 bg-neutral-50'
+                          : 'border-neutral-200 hover:border-neutral-400'
+                          }`}
                       >
                         <div className="flex items-start justify-between">
                           <div className="flex-1">
@@ -471,11 +491,10 @@ function CheckoutContent() {
                             <p className="text-sm text-neutral-600">{address.country}</p>
                             <p className="text-sm text-neutral-600 mt-1">{address.phone}</p>
                           </div>
-                          <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
-                            selectedAddressId === address.id
-                              ? 'border-neutral-900 bg-neutral-900'
-                              : 'border-neutral-300'
-                          }`}>
+                          <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${selectedAddressId === address.id
+                            ? 'border-neutral-900 bg-neutral-900'
+                            : 'border-neutral-300'
+                            }`}>
                             {selectedAddressId === address.id && (
                               <div className="w-2 h-2 rounded-full bg-white"></div>
                             )}
@@ -531,9 +550,8 @@ function CheckoutContent() {
                       placeholder="Full Name"
                       value={newAddressForm.name}
                       onChange={(e) => setNewAddressForm({ ...newAddressForm, name: e.target.value })}
-                      className={`w-full p-3 border rounded-md focus:outline-none focus:ring-1 focus:ring-neutral-900 ${
-                        addressValidationErrors.name ? 'border-red-300' : 'border-neutral-200'
-                      }`}
+                      className={`w-full p-3 border rounded-md focus:outline-none focus:ring-1 focus:ring-neutral-900 ${addressValidationErrors.name ? 'border-red-300' : 'border-neutral-200'
+                        }`}
                     />
                     {addressValidationErrors.name && (
                       <p className="text-xs text-red-600 mt-1">{addressValidationErrors.name}</p>
@@ -545,9 +563,8 @@ function CheckoutContent() {
                       placeholder="Street Address"
                       value={newAddressForm.street}
                       onChange={(e) => setNewAddressForm({ ...newAddressForm, street: e.target.value })}
-                      className={`w-full p-3 border rounded-md focus:outline-none focus:ring-1 focus:ring-neutral-900 ${
-                        addressValidationErrors.street ? 'border-red-300' : 'border-neutral-200'
-                      }`}
+                      className={`w-full p-3 border rounded-md focus:outline-none focus:ring-1 focus:ring-neutral-900 ${addressValidationErrors.street ? 'border-red-300' : 'border-neutral-200'
+                        }`}
                     />
                     {addressValidationErrors.street && (
                       <p className="text-xs text-red-600 mt-1">{addressValidationErrors.street}</p>
@@ -560,9 +577,8 @@ function CheckoutContent() {
                         placeholder="City"
                         value={newAddressForm.city}
                         onChange={(e) => setNewAddressForm({ ...newAddressForm, city: e.target.value })}
-                        className={`w-full p-3 border rounded-md focus:outline-none focus:ring-1 focus:ring-neutral-900 ${
-                          addressValidationErrors.city ? 'border-red-300' : 'border-neutral-200'
-                        }`}
+                        className={`w-full p-3 border rounded-md focus:outline-none focus:ring-1 focus:ring-neutral-900 ${addressValidationErrors.city ? 'border-red-300' : 'border-neutral-200'
+                          }`}
                       />
                       {addressValidationErrors.city && (
                         <p className="text-xs text-red-600 mt-1">{addressValidationErrors.city}</p>
@@ -574,9 +590,8 @@ function CheckoutContent() {
                         placeholder="State"
                         value={newAddressForm.state}
                         onChange={(e) => setNewAddressForm({ ...newAddressForm, state: e.target.value })}
-                        className={`w-full p-3 border rounded-md focus:outline-none focus:ring-1 focus:ring-neutral-900 ${
-                          addressValidationErrors.state ? 'border-red-300' : 'border-neutral-200'
-                        }`}
+                        className={`w-full p-3 border rounded-md focus:outline-none focus:ring-1 focus:ring-neutral-900 ${addressValidationErrors.state ? 'border-red-300' : 'border-neutral-200'
+                          }`}
                       />
                       {addressValidationErrors.state && (
                         <p className="text-xs text-red-600 mt-1">{addressValidationErrors.state}</p>
@@ -590,9 +605,8 @@ function CheckoutContent() {
                         placeholder="ZIP Code"
                         value={newAddressForm.zip}
                         onChange={(e) => setNewAddressForm({ ...newAddressForm, zip: e.target.value })}
-                        className={`w-full p-3 border rounded-md focus:outline-none focus:ring-1 focus:ring-neutral-900 ${
-                          addressValidationErrors.zip ? 'border-red-300' : 'border-neutral-200'
-                        }`}
+                        className={`w-full p-3 border rounded-md focus:outline-none focus:ring-1 focus:ring-neutral-900 ${addressValidationErrors.zip ? 'border-red-300' : 'border-neutral-200'
+                          }`}
                       />
                       {addressValidationErrors.zip && (
                         <p className="text-xs text-red-600 mt-1">{addressValidationErrors.zip}</p>
@@ -604,9 +618,8 @@ function CheckoutContent() {
                         placeholder="Country"
                         value={newAddressForm.country}
                         onChange={(e) => setNewAddressForm({ ...newAddressForm, country: e.target.value })}
-                        className={`w-full p-3 border rounded-md focus:outline-none focus:ring-1 focus:ring-neutral-900 ${
-                          addressValidationErrors.country ? 'border-red-300' : 'border-neutral-200'
-                        }`}
+                        className={`w-full p-3 border rounded-md focus:outline-none focus:ring-1 focus:ring-neutral-900 ${addressValidationErrors.country ? 'border-red-300' : 'border-neutral-200'
+                          }`}
                       />
                       {addressValidationErrors.country && (
                         <p className="text-xs text-red-600 mt-1">{addressValidationErrors.country}</p>
@@ -619,9 +632,8 @@ function CheckoutContent() {
                       placeholder="Phone Number"
                       value={newAddressForm.phone}
                       onChange={(e) => setNewAddressForm({ ...newAddressForm, phone: e.target.value })}
-                      className={`w-full p-3 border rounded-md focus:outline-none focus:ring-1 focus:ring-neutral-900 ${
-                        addressValidationErrors.phone ? 'border-red-300' : 'border-neutral-200'
-                      }`}
+                      className={`w-full p-3 border rounded-md focus:outline-none focus:ring-1 focus:ring-neutral-900 ${addressValidationErrors.phone ? 'border-red-300' : 'border-neutral-200'
+                        }`}
                     />
                     {addressValidationErrors.phone && (
                       <p className="text-xs text-red-600 mt-1">{addressValidationErrors.phone}</p>
@@ -673,29 +685,53 @@ function CheckoutContent() {
           <div className="space-y-6">
             <div className="flex items-center space-x-3">
               <div className="bg-neutral-900 text-white w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold">3</div>
-              <h2 className="text-xl font-medium">Payment</h2>
+              <h2 className="text-xl font-medium">Payment Method</h2>
             </div>
-            <div className="p-6 border border-neutral-200 rounded-xl space-y-4">
-              <div className="flex items-center justify-between pb-4 border-b border-neutral-100">
-                <div className="flex items-center space-x-3">
-                  <CreditCard size={24} />
-                  <span className="font-medium">Razorpay Payment</span>
+
+            <div className="space-y-4">
+              {/* Prepaid Option */}
+              <div
+                onClick={() => setPaymentMode('PREPAID')}
+                className={`p-4 border rounded-xl cursor-pointer transition-all ${paymentMode === 'PREPAID' ? 'border-neutral-900 bg-neutral-50 ring-1 ring-neutral-900' : 'border-neutral-200'}`}
+              >
+                <div className="flex items-center space-x-3 mb-3">
+                  <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${paymentMode === 'PREPAID' ? 'border-neutral-900 bg-neutral-900' : 'border-neutral-300'}`}>
+                    {paymentMode === 'PREPAID' && <div className="w-2 h-2 rounded-full bg-white"></div>}
+                  </div>
+                  <span className="font-medium">Full Payment (Prepaid)</span>
                 </div>
-                <div className="flex space-x-2">
-                  <div className="w-8 h-5 bg-neutral-100 border border-neutral-200 rounded text-[6px] flex items-center justify-center">VISA</div>
-                  <div className="w-8 h-5 bg-neutral-100 border border-neutral-200 rounded text-[6px] flex items-center justify-center">MASTER</div>
-                  <div className="w-8 h-5 bg-neutral-100 border border-neutral-200 rounded text-[6px] flex items-center justify-center">UPI</div>
-                </div>
+                {paymentMode === 'PREPAID' && (
+                  <div className="pl-8 text-sm text-neutral-600 space-y-2">
+                    <p>Pay the full amount now using Credit/Debit Card, UPI, or Netbanking.</p>
+                    <div className="flex items-center space-x-2">
+                      <CreditCard size={16} />
+                      <span>Secure Payment by Razorpay</span>
+                    </div>
+                  </div>
+                )}
               </div>
-              <div className="pt-4">
-                <p className="text-sm text-neutral-600">
-                  You will be redirected to Razorpay secure payment gateway to complete your payment.
-                  We support Credit/Debit Cards, UPI, Net Banking, and Wallets.
-                </p>
-                {!razorpayLoaded && (
-                  <div className="mt-4 flex items-center space-x-2 text-sm text-neutral-500">
-                    <Loader2 size={16} className="animate-spin" />
-                    <span>Loading payment gateway...</span>
+
+              {/* Partial COD Option */}
+              <div
+                onClick={() => setPaymentMode('PARTIAL_COD')}
+                className={`p-4 border rounded-xl cursor-pointer transition-all ${paymentMode === 'PARTIAL_COD' ? 'border-neutral-900 bg-neutral-50 ring-1 ring-neutral-900' : 'border-neutral-200'}`}
+              >
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center space-x-3">
+                    <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${paymentMode === 'PARTIAL_COD' ? 'border-neutral-900 bg-neutral-900' : 'border-neutral-300'}`}>
+                      {paymentMode === 'PARTIAL_COD' && <div className="w-2 h-2 rounded-full bg-white"></div>}
+                    </div>
+                    <span className="font-medium">Partial Cash on Delivery</span>
+                  </div>
+                  <span className="bg-yellow-100 text-yellow-800 text-xs px-2 py-1 rounded font-medium">Pay ₹70 Now</span>
+                </div>
+                {paymentMode === 'PARTIAL_COD' && (
+                  <div className="pl-8 text-sm text-neutral-600 space-y-2 animate-in slide-in-from-top-2 duration-200">
+                    <p>Pay <span className="font-bold">₹70</span> advance now to confirm your order.</p>
+                    <p>The remaining amount of <span className="font-bold">{formatCurrency(grandTotal - advanceAmount)}</span> will be collected at the time of delivery.</p>
+                    <div className="p-3 bg-yellow-50 rounded border border-yellow-200 text-yellow-800 text-xs">
+                      <p>⚠ The advance payment of ₹70 is non-refundable if you cancel the order after dispatch.</p>
+                    </div>
                   </div>
                 )}
               </div>
@@ -707,7 +743,7 @@ function CheckoutContent() {
               {error || paymentError}
             </div>
           )}
-          <button 
+          <button
             onClick={handlePlaceOrder}
             disabled={loading || isProcessingPayment || !razorpayLoaded}
             className="w-full py-5 bg-neutral-900 text-white font-bold uppercase tracking-widest hover:bg-neutral-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
@@ -723,7 +759,9 @@ function CheckoutContent() {
                 <span>Creating Order...</span>
               </>
             ) : (
-              `Pay ${formatCurrency(grandTotal)}`
+              paymentMode === 'PARTIAL_COD'
+                ? `Pay Advance ₹70 & Place Order`
+                : `Pay ${formatCurrency(grandTotal)}`
             )}
           </button>
         </div>
@@ -750,10 +788,20 @@ function CheckoutContent() {
             </div>
 
             <div className="space-y-3 pt-6 border-t border-neutral-200">
-              <div className="flex justify-between text-neutral-600">
+              <PromoCodeInput />
+
+              <div className="flex justify-between text-neutral-600 pt-4">
                 <span>Subtotal</span>
-                <span>{formatCurrency(totalPrice)}</span>
+                <span>{formatCurrency(subtotal)}</span>
               </div>
+
+              {discountAmount > 0 && (
+                <div className="flex justify-between text-green-600 font-medium my-2">
+                  <span>Discount</span>
+                  <span>-{formatCurrency(discountAmount)}</span>
+                </div>
+              )}
+
               <div className="flex justify-between text-neutral-600">
                 <span>Shipping</span>
                 <span>{formatCurrency(shipping)}</span>
@@ -762,10 +810,23 @@ function CheckoutContent() {
                 <span>Estimated Tax</span>
                 <span>{formatCurrency(tax)}</span>
               </div>
-              <div className="flex justify-between text-xl font-bold pt-4">
+              <div className="flex justify-between text-xl font-bold pt-4 border-t border-neutral-200 mt-4">
                 <span>Total</span>
                 <span>{formatCurrency(grandTotal)}</span>
               </div>
+
+              {paymentMode === 'PARTIAL_COD' && (
+                <div className="bg-neutral-50 p-3 rounded border border-neutral-200 mt-2 space-y-2">
+                  <div className="flex justify-between text-sm font-medium">
+                    <span>To Pay Now:</span>
+                    <span>{formatCurrency(advanceAmount)}</span>
+                  </div>
+                  <div className="flex justify-between text-sm text-neutral-500">
+                    <span>Due on Delivery:</span>
+                    <span>{formatCurrency(Math.max(0, grandTotal - advanceAmount))}</span>
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="bg-white p-4 rounded-lg border border-neutral-100 flex items-center space-x-4">

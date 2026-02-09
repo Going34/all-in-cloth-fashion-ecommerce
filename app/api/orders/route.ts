@@ -10,7 +10,7 @@ export async function GET(request: NextRequest) {
   try {
     const user = await requireAuth();
     const searchParams = request.nextUrl.searchParams;
-    
+
     const filters: { status?: OrderStatus; limit?: number } = {};
     if (searchParams.get('status')) {
       filters.status = searchParams.get('status') as OrderStatus;
@@ -44,6 +44,9 @@ export async function POST(request: NextRequest) {
 
     return successResponse(order, 201);
   } catch (error) {
+    console.error('[ORDER API ERROR]:', error);
+    console.error('[ORDER API ERROR STACK]:', error instanceof Error ? error.stack : 'No stack trace');
+    console.error('[ORDER API ERROR TYPE]:', typeof error, error);
     return errorResponse(error);
   }
 }

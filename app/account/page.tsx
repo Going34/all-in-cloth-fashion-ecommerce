@@ -2,6 +2,7 @@
 
 import React, { useEffect } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { Package, ChevronRight } from 'lucide-react';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import { ordersActions } from '../../store/slices/orders/ordersSlice';
@@ -34,33 +35,43 @@ function AccountContent() {
   return (
     <AccountLayout>
       <div className="space-y-8">
-          <section className="bg-white border border-neutral-100 rounded-xl overflow-hidden">
-            <div className="p-6 border-b border-neutral-100 flex justify-between items-center">
-              <h3 className="text-lg font-medium">Recent Orders</h3>
-              {/* <button className="text-sm text-neutral-400 hover:text-neutral-900 transition-colors">View All</button> */}
+        <section className="bg-white border border-neutral-100 rounded-xl overflow-hidden">
+          <div className="p-6 border-b border-neutral-100 flex justify-between items-center">
+            <h3 className="text-lg font-medium">Recent Orders</h3>
+            {/* <button className="text-sm text-neutral-400 hover:text-neutral-900 transition-colors">View All</button> */}
+          </div>
+          {loading && (
+            <div className="p-6 text-center">
+              <p className="text-neutral-500">Loading orders...</p>
             </div>
-            {loading && (
-              <div className="p-6 text-center">
-                <p className="text-neutral-500">Loading orders...</p>
-              </div>
-            )}
-            {error && (
-              <div className="p-6 text-center">
-                <p className="text-red-500">Error loading orders: {error}</p>
-              </div>
-            )}
-            {!loading && !error && orders.length === 0 && (
-              <div className="p-6 text-center">
-                <p className="text-neutral-500">No orders found</p>
-              </div>
-            )}
-            {!loading && !error && orders.length > 0 && (
-              <div className="divide-y divide-neutral-100">
-                {orders.map((order) => (
-                  <div key={order.id} className="p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          )}
+          {error && (
+            <div className="p-6 text-center">
+              <p className="text-red-500">Error loading orders: {error}</p>
+            </div>
+          )}
+          {!loading && !error && orders.length === 0 && (
+            <div className="p-6 text-center">
+              <p className="text-neutral-500">No orders found</p>
+            </div>
+          )}
+          {!loading && !error && orders.length > 0 && (
+            <div className="divide-y divide-neutral-100">
+              {orders.map((order) => (
+                <div key={order.id} className="p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                   <div className="flex items-center space-x-4">
-                    <div className="w-16 h-16 bg-neutral-100 rounded-lg flex items-center justify-center">
-                      <Package size={24} className="text-neutral-400" />
+                    <div className="w-16 h-16 bg-neutral-100 rounded-lg flex items-center justify-center overflow-hidden relative border border-neutral-200 flex-shrink-0">
+                      {(order as any).items && (order as any).items.length > 0 && (order as any).items[0].image_url ? (
+                        <Image
+                          src={(order as any).items[0].image_url}
+                          alt={`Order #${order.order_number}`}
+                          fill
+                          className="object-cover"
+                          unoptimized
+                        />
+                      ) : (
+                        <Package size={24} className="text-neutral-400" />
+                      )}
                     </div>
                     <div>
                       <p className="font-medium">{order.order_number}</p>
@@ -77,49 +88,49 @@ function AccountContent() {
                         {order.status}
                       </span>
                     </div>
-                    <button className="text-neutral-300 hover:text-neutral-900" aria-label="View order details">
+                    <Link href={`/account/orders/${order.id}`} className="text-neutral-300 hover:text-neutral-900" aria-label="View order details">
                       <ChevronRight size={20} />
-                    </button>
+                    </Link>
                   </div>
                 </div>
-                ))}
-              </div>
-            )}
-            {!loading && !error && hasMore && (
-              <div className="p-6 border-t border-neutral-100 flex justify-center">
-                <button
-                  onClick={() => dispatch(ordersActions.fetchUserOrdersNextPageRequest())}
-                  disabled={loadingMore}
-                  className="px-4 py-2 text-sm border border-neutral-200 rounded-lg hover:border-neutral-400 disabled:opacity-50"
-                >
-                  {loadingMore ? 'Loading...' : 'Load more'}
-                </button>
-              </div>
-            )}
-          </section>
+              ))}
+            </div>
+          )}
+          {!loading && !error && hasMore && (
+            <div className="p-6 border-t border-neutral-100 flex justify-center">
+              <button
+                onClick={() => dispatch(ordersActions.fetchUserOrdersNextPageRequest())}
+                disabled={loadingMore}
+                className="px-4 py-2 text-sm border border-neutral-200 rounded-lg hover:border-neutral-400 disabled:opacity-50"
+              >
+                {loadingMore ? 'Loading...' : 'Load more'}
+              </button>
+            </div>
+          )}
+        </section>
 
-          <section className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="p-6 border border-neutral-100 rounded-xl space-y-4">
-              <h3 className="font-medium">Primary Address</h3>
-              {defaultAddress ? (
-                <div className="text-sm text-neutral-500 space-y-1">
-                  <p>{defaultAddress.street}</p>
-                  <p>{defaultAddress.city}, {defaultAddress.state} {defaultAddress.zip}</p>
-                  <p>{defaultAddress.country}</p>
-                </div>
-              ) : (
-                <div className="text-sm text-neutral-500">
-                  <p>No default address set</p>
-                </div>
-              )}
-              <Link href="/addresses" className="text-sm text-neutral-900 font-medium underline underline-offset-4">Manage Addresses</Link>
-            </div>
-            <div className="p-6 border border-neutral-100 rounded-xl space-y-4">
-              <h3 className="font-medium">Wishlist Status</h3>
-              <p className="text-sm text-neutral-500">You have items waiting in your curated collection.</p>
-              <Link href="/wishlist" className="text-sm text-neutral-900 font-medium underline underline-offset-4">View Wishlist</Link>
-            </div>
-          </section>
+        <section className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="p-6 border border-neutral-100 rounded-xl space-y-4">
+            <h3 className="font-medium">Primary Address</h3>
+            {defaultAddress ? (
+              <div className="text-sm text-neutral-500 space-y-1">
+                <p>{defaultAddress.street}</p>
+                <p>{defaultAddress.city}, {defaultAddress.state} {defaultAddress.zip}</p>
+                <p>{defaultAddress.country}</p>
+              </div>
+            ) : (
+              <div className="text-sm text-neutral-500">
+                <p>No default address set</p>
+              </div>
+            )}
+            <Link href="/addresses" className="text-sm text-neutral-900 font-medium underline underline-offset-4">Manage Addresses</Link>
+          </div>
+          <div className="p-6 border border-neutral-100 rounded-xl space-y-4">
+            <h3 className="font-medium">Wishlist Status</h3>
+            <p className="text-sm text-neutral-500">You have items waiting in your curated collection.</p>
+            <Link href="/wishlist" className="text-sm text-neutral-900 font-medium underline underline-offset-4">View Wishlist</Link>
+          </div>
+        </section>
       </div>
     </AccountLayout>
   );

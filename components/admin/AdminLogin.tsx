@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
+import Image from 'next/image';
 import { Mail, KeyRound, ShieldCheck, ArrowRight, Loader2 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 
@@ -75,8 +76,18 @@ const AdminLogin: React.FC = () => {
             <ShieldCheck size={40} strokeWidth={1.5} />
           </div>
           <div>
+            <div className="flex justify-center mb-6">
+              <Image
+                src="/logo.png"
+                alt="All in Cloth"
+                width={180}
+                height={60}
+                className="h-12 w-auto object-contain brightness-0 invert"
+                priority
+              />
+            </div>
             <h1 className="text-3xl font-serif text-white tracking-tight">Admin Portal</h1>
-            <p className="text-slate-400 text-sm mt-1 uppercase tracking-widest font-medium">All in Cloth Management Suite</p>
+            <p className="text-slate-400 text-sm mt-1 uppercase tracking-widest font-medium">Management Suite</p>
           </div>
         </div>
 

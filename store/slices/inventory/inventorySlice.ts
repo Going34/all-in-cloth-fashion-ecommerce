@@ -1,5 +1,5 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
-import type { InventoryItem } from '@/types';
+import type { InventoryListItem } from '@/modules/inventory/inventory.types';
 
 export interface InventoryFilters {
   page?: number;
@@ -9,7 +9,7 @@ export interface InventoryFilters {
 }
 
 export interface InventoryState {
-  data: InventoryItem[];
+  data: InventoryListItem[];
   loading: boolean;
   error: string | null;
   filters: InventoryFilters;
@@ -55,7 +55,7 @@ const inventorySlice = createSlice({
         state.filters = { ...state.filters, ...action.payload };
       }
     },
-    fetchInventoryDataSuccess: (state, action: PayloadAction<{ items: InventoryItem[]; pagination: InventoryState['pagination'] }>) => {
+    fetchInventoryDataSuccess: (state, action: PayloadAction<{ items: InventoryListItem[]; pagination: InventoryState['pagination'] }>) => {
       state.loading = false;
       state.data = action.payload.items;
       state.pagination = action.payload.pagination;
@@ -82,10 +82,10 @@ const inventorySlice = createSlice({
       state.loading = true;
       state.error = null;
     },
-    updateStockSuccess: (state, action: PayloadAction<InventoryItem>) => {
+    updateStockSuccess: (state, action: PayloadAction<InventoryListItem>) => {
       state.loading = false;
       state.data = state.data.map((item) =>
-        item.variant_id === action.payload.variant_id ? action.payload : item
+        item.variantId === action.payload.variantId ? action.payload : item
       );
       state.error = null;
     },

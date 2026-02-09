@@ -23,13 +23,30 @@ export async function POST(request: NextRequest) {
       return errorResponse(new Error('Unauthorized'), 403);
     }
 
-    const idempotencyKey = body.idempotency_key || request.headers.get('idempotency-key');
+	    const idempotencyKey = body.idempotency_key || request.headers.get('idempotency-key');
+
+	    // Determine how much the customer should pay now.
+	    // For PREPAID we charge the full total. For PARTIAL_COD we
+	    // only charge the fixed advance amount (₹70).
+	    const clientPaymentMode = body.payment_mode as 'PREPAID' | 'COD' | 'PARTIAL_COD' | undefined;
+	    const clientAdvanceAmount =
+	      typeof body.advance_amount === 'number' && !Number.isNaN(body.advance_amount)
+	        ? body.advance_amount
+	        : undefined;
+
+	    const isPartialCod = order.payment_mode === 'PARTIAL_COD' || clientPaymentMode === 'PARTIAL_COD';
+
+	    let amountToPay = order.total;
+	    if (isPartialCod) {
+	      const advanceAmount = order.advance_payment_amount || clientAdvanceAmount || 70; // Fallback to 70 if not set
+	      amountToPay = advanceAmount;
+	    }
 
     const result = await createPaymentOrder(
       {
         order_id: body.order_id,
         method: 'razorpay',
-        amount: order.total,
+        amount: amountToPay,
       },
       idempotencyKey || undefined
     );

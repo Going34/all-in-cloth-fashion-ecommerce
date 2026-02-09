@@ -5,6 +5,7 @@ import { X, Minus, Plus, ShoppingBag } from 'lucide-react';
 import { useCart } from '../context/CartContext';
 import Link from 'next/link';
 import { formatCurrency } from '../utils/currency';
+import { PromoCodeInput } from './cart/PromoCodeInput';
 
 interface CartDrawerProps {
   isOpen: boolean;
@@ -12,17 +13,17 @@ interface CartDrawerProps {
 }
 
 const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
-  const { cart, removeFromCart, updateQuantity, totalPrice } = useCart();
+  const { cart, removeFromCart, updateQuantity, totalPrice, subtotal, discountAmount, finalTotal } = useCart();
 
   if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 z-[100] overflow-hidden">
-      <div 
+      <div
         className="absolute inset-0 bg-black/30 backdrop-blur-sm transition-opacity"
         onClick={onClose}
       />
-      
+
       <div className="absolute inset-y-0 right-0 max-w-full flex">
         <div className="w-screen max-w-md bg-white shadow-2xl animate-in slide-in-from-right duration-300 flex flex-col">
           <div className="flex items-center justify-between p-6 border-b border-neutral-100">
@@ -40,7 +41,7 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
                   <p className="text-lg font-medium">Your cart is empty</p>
                   <p className="text-neutral-500">Discover something you love.</p>
                 </div>
-                <button 
+                <button
                   onClick={onClose}
                   className="px-8 py-3 bg-neutral-900 text-white font-medium hover:bg-neutral-800 transition-colors"
                 >
@@ -65,21 +66,21 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
                     </div>
                     <div className="flex items-center justify-between mt-4">
                       <div className="flex items-center border border-neutral-200">
-                        <button 
+                        <button
                           onClick={() => updateQuantity(item.variant_id, item.quantity - 1)}
                           className="p-1 hover:bg-neutral-50"
                         >
                           <Minus size={14} />
                         </button>
                         <span className="w-8 text-center text-sm">{item.quantity}</span>
-                        <button 
+                        <button
                           onClick={() => updateQuantity(item.variant_id, item.quantity + 1)}
                           className="p-1 hover:bg-neutral-50"
                         >
                           <Plus size={14} />
                         </button>
                       </div>
-                      <button 
+                      <button
                         onClick={() => removeFromCart(item.variant_id)}
                         className="text-xs text-neutral-400 hover:text-red-500 underline"
                       >
@@ -93,20 +94,38 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
           </div>
 
           {cart.length > 0 && (
-            <div className="p-6 border-t border-neutral-100 space-y-4">
-              <div className="flex justify-between text-lg font-medium">
-                <span>Subtotal</span>
-                <span>{formatCurrency(totalPrice)}</span>
+            <>
+              <div className="px-6 border-t border-neutral-100 pt-6">
+                <PromoCodeInput />
               </div>
-              <p className="text-xs text-neutral-500">Shipping and taxes calculated at checkout.</p>
-              <Link 
-                href="/checkout" 
-                onClick={onClose}
-                className="block w-full py-4 bg-neutral-900 text-white text-center font-medium hover:bg-neutral-800 transition-colors"
-              >
-                Checkout
-              </Link>
-            </div>
+
+              <div className="p-6 border-t border-neutral-100 space-y-4">
+                <div className="space-y-2">
+                  <div className="flex justify-between text-base text-neutral-600">
+                    <span>Subtotal</span>
+                    <span>{formatCurrency(subtotal)}</span>
+                  </div>
+                  {discountAmount > 0 && (
+                    <div className="flex justify-between text-base text-green-600 font-medium">
+                      <span>Discount</span>
+                      <span>-{formatCurrency(discountAmount)}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between text-lg font-bold border-t border-dashed border-neutral-200 pt-2">
+                    <span>Total</span>
+                    <span>{formatCurrency(finalTotal)}</span>
+                  </div>
+                </div>
+                <p className="text-xs text-neutral-500">Shipping and taxes calculated at checkout.</p>
+                <Link
+                  href="/checkout"
+                  onClick={onClose}
+                  className="block w-full py-4 bg-neutral-900 text-white text-center font-medium hover:bg-neutral-800 transition-colors"
+                >
+                  Checkout
+                </Link>
+              </div>
+            </>
           )}
         </div>
       </div>

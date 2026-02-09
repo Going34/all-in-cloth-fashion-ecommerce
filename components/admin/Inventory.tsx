@@ -3,15 +3,16 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { inventoryActions } from '@/store/slices/inventory/inventorySlice';
-import { 
-  selectInventory, 
-  selectInventoryLoading, 
+import {
+  selectInventory,
+  selectInventoryLoading,
   selectInventoryError,
   selectInventoryPagination,
   selectInventoryStats
 } from '@/store/slices/inventory/inventorySelectors';
-import { Package, Search, Filter, RefreshCw, CheckCircle2, AlertTriangle, X, Save, Plus, Minus, Loader2 } from 'lucide-react';
-import { InventoryItem } from '../../types';
+	import { Package, Search, RefreshCw, CheckCircle2, AlertTriangle, X, Save, Loader2 } from 'lucide-react';
+	import type { InventoryListItem } from '@/modules/inventory/inventory.types';
+	import { toastActions } from '@/store/slices/toast/toastSlice';
 
 const Inventory: React.FC = () => {
   const dispatch = useAppDispatch();
@@ -24,26 +25,26 @@ const Inventory: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('All');
   const [isUpdateModalOpen, setIsUpdateModalOpen] = useState(false);
-  const [selectedItem, setSelectedItem] = useState<InventoryItem | null>(null);
-  const [stockUpdate, setStockUpdate] = useState({ quantity: '', action: 'set' as 'set' | 'add' | 'subtract' });
+  const [selectedItem, setSelectedItem] = useState<InventoryListItem | null>(null);
+	  const [stockUpdate, setStockUpdate] = useState({ quantity: '', action: 'set' as 'set' | 'add' | 'subtract' });
 
-  useEffect(() => {
-    dispatch(inventoryActions.fetchInventoryDataRequest({ 
-      page: pagination.page, 
-      limit: pagination.limit,
-      search: searchTerm || undefined,
-      status: statusFilter !== 'All' ? statusFilter as 'in_stock' | 'low_stock' | 'out_of_stock' : undefined,
-    }));
-    dispatch(inventoryActions.fetchInventoryStatsRequest());
-  }, [dispatch, pagination.page, pagination.limit, searchTerm, statusFilter]);
+	  useEffect(() => {
+	    dispatch(inventoryActions.fetchInventoryDataRequest({ 
+	      page: pagination.page, 
+	      limit: pagination.limit,
+	      search: searchTerm || undefined,
+	      status: statusFilter !== 'All' ? (statusFilter as 'in_stock' | 'low_stock' | 'out_of_stock') : undefined,
+	    }));
+	    dispatch(inventoryActions.fetchInventoryStatsRequest());
+	  }, [dispatch, pagination.page, pagination.limit, searchTerm, statusFilter]);
 
-  const filteredInventory = useMemo(() => {
+	  const filteredInventory = useMemo(() => {
     let filtered = inventory;
 
     if (searchTerm) {
-      filtered = filtered.filter(item => 
+      filtered = filtered.filter(item =>
         item.sku.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        item.product_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        item.productName.toLowerCase().includes(searchTerm.toLowerCase()) ||
         item.color.toLowerCase().includes(searchTerm.toLowerCase()) ||
         item.size.toLowerCase().includes(searchTerm.toLowerCase())
       );
@@ -61,8 +62,8 @@ const Inventory: React.FC = () => {
       }
     }
 
-    return filtered;
-  }, [inventory, searchTerm, statusFilter]);
+	    return filtered;
+	  }, [inventory, searchTerm, statusFilter]);
 
   const displayStats = stats || {
     totalSKUs: inventory.length,
@@ -71,30 +72,37 @@ const Inventory: React.FC = () => {
     inStockHealthyCount: inventory.filter(item => item.status === 'in_stock').length,
   };
 
-  const openUpdateModal = (item: InventoryItem) => {
+  const openUpdateModal = (item: InventoryListItem) => {
     setSelectedItem(item);
     setStockUpdate({ quantity: item.stock.toString(), action: 'set' });
     setIsUpdateModalOpen(true);
   };
 
-  const handleStockUpdate = () => {
-    if (!selectedItem || !stockUpdate.quantity) return;
+	  const handleStockUpdate = () => {
+	    if (!selectedItem || !stockUpdate.quantity) return;
 
-    const quantity = parseInt(stockUpdate.quantity);
-    if (isNaN(quantity) || quantity < 0) {
-      alert('Please enter a valid quantity');
-      return;
-    }
+	    const quantity = parseInt(stockUpdate.quantity, 10);
+	    if (Number.isNaN(quantity) || quantity < 0) {
+	      dispatch(toastActions.showToast('Please enter a valid quantity', 'error'));
+	      return;
+	    }
 
-    dispatch(inventoryActions.updateStockRequest({
-      variantId: selectedItem.variant_id,
-      action: stockUpdate.action,
-      quantity: quantity,
-    }));
+	    // Use variantId from InventoryListItem type (camelCase)
+	    if (!selectedItem.variantId) {
+	      console.error('variantId is missing:', selectedItem);
+	      dispatch(toastActions.showToast('Error: Product variant ID is missing', 'error'));
+	      return;
+	    }
 
-    setIsUpdateModalOpen(false);
-    setSelectedItem(null);
-  };
+	    dispatch(inventoryActions.updateStockRequest({
+	      variantId: selectedItem.variantId,
+	      action: stockUpdate.action,
+	      quantity,
+	    }));
+
+	    setIsUpdateModalOpen(false);
+	    setSelectedItem(null);
+	  };
 
   const handleRefresh = () => {
     setSearchTerm('');
@@ -202,11 +210,11 @@ const Inventory: React.FC = () => {
                     </tr>
                   ) : (
                     filteredInventory.map((item) => (
-                      <tr key={item.variant_id} className="hover:bg-slate-50/50 transition-colors">
+                      <tr key={item.variantId} className="hover:bg-slate-50/50 transition-colors">
                         <td className="px-6 py-4 text-xs font-bold text-slate-900 font-mono tracking-tight">{item.sku}</td>
                         <td className="px-6 py-4">
                           <div className="flex flex-col">
-                            <span className="text-sm font-bold text-slate-900">{item.product_name}</span>
+                            <span className="text-sm font-bold text-slate-900">{item.productName}</span>
                             <span className="text-[10px] text-slate-500">{item.color} / {item.size}</span>
                           </div>
                         </td>
@@ -220,16 +228,16 @@ const Inventory: React.FC = () => {
                         </td>
                         <td className="px-6 py-4">
                           <div className="flex items-center space-x-3">
-                            <span className={`text-sm font-bold ${item.stock <= item.low_stock_threshold ? 'text-red-600' : 'text-slate-900'}`}>{item.stock}</span>
+                            <span className={`text-sm font-bold ${item.stock <= item.lowStockThreshold ? 'text-red-600' : 'text-slate-900'}`}>{item.stock}</span>
                             <div className="w-24 h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                              <div 
-                                className={`h-full transition-all ${item.stock <= item.low_stock_threshold ? 'bg-red-500' : 'bg-green-500'}`}
-                                style={{ width: `${Math.min(100, (item.stock / (item.low_stock_threshold * 4)) * 100)}%` }}
+                              <div
+                                className={`h-full transition-all ${item.stock <= item.lowStockThreshold ? 'bg-red-500' : 'bg-green-500'}`}
+                                style={{ width: `${Math.min(100, (item.stock / (item.lowStockThreshold * 4)) * 100)}%` }}
                               ></div>
                             </div>
                           </div>
                         </td>
-                        <td className="px-6 py-4 text-sm text-slate-600">{item.low_stock_threshold}</td>
+                        <td className="px-6 py-4 text-sm text-slate-600">{item.lowStockThreshold}</td>
                         <td className="px-6 py-4 text-right">
                           <button 
                             onClick={() => openUpdateModal(item)}
@@ -282,7 +290,7 @@ const Inventory: React.FC = () => {
       </div>
 
       {/* Update Stock Modal */}
-      {isUpdateModalOpen && selectedItem && (
+	      {isUpdateModalOpen && selectedItem && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6">
             <div className="flex items-center justify-between mb-6">
@@ -296,7 +304,7 @@ const Inventory: React.FC = () => {
             </div>
             <div className="space-y-4">
               <div>
-                <p className="text-sm font-bold text-slate-900 mb-1">{selectedItem.product_name}</p>
+                <p className="text-sm font-bold text-slate-900 mb-1">{selectedItem.productName}</p>
                 <p className="text-xs text-slate-500">{selectedItem.color} / {selectedItem.size} - {selectedItem.sku}</p>
                 <p className="text-sm text-slate-600 mt-2">Current Stock: <span className="font-bold">{selectedItem.stock}</span></p>
               </div>
@@ -353,9 +361,9 @@ const Inventory: React.FC = () => {
             </div>
           </div>
         </div>
-      )}
-    </div>
-  );
+	      )}
+	    </div>
+	  );
 };
 
 export default Inventory;

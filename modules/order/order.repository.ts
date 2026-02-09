@@ -1,7 +1,7 @@
 import { getAdminDbClient } from '@/lib/adminDb';
 import { NotFoundError, ConflictError } from '@/lib/errors';
-import type { OrderItem, OrderStatus, OrderStatusHistory, Payment } from '@/types';
-import type { AdminOrderListItem, CreateOrderRequest, OrderResponse } from './order.types';
+import type { OrderItem, OrderStatus, OrderStatusHistory, Payment, Address } from '@/types';
+import type { AdminOrderListItem, CreateOrderRequest, OrderResponse, EnrichedOrderItem } from './order.types';
 
 type Row = Record<string, unknown>;
 
@@ -13,29 +13,94 @@ export async function findOrderById(id: string): Promise<OrderResponse | null> {
     .select(
       `
       *,
-      order_items (*),
+      order_items (
+        *,
+        product_variants (
+            id,
+            color,
+            size,
+            products (
+                id,
+                name,
+                product_images (
+                    image_url,
+                    display_order
+                )
+            ),
+            variant_images (
+                image_url,
+                display_order
+            )
+        )
+      ),
       order_status_history (*),
-      payments (*)
+      payments (*),
+      addresses!orders_address_id_fkey (*)
     `
     )
     .eq('id', id)
     .single();
 
-  if (error || !data) {
+  if (error) {
+    console.error('Error finding order:', error);
+    return null;
+  }
+  if (!data) {
+    console.error('Order not found in DB', id);
     return null;
   }
 
-  const order = data as unknown as OrderResponse & {
-    order_items?: OrderItem[];
-    order_status_history?: OrderStatusHistory[];
-    payments?: Payment[];
+  // Helper types for the raw response structure
+  type RawVariantImage = { image_url: string; display_order?: number };
+  type RawProductImage = { image_url: string; display_order?: number };
+  type RawProduct = { id: string; name: string; product_images?: RawProductImage[] };
+  type RawVariant = {
+    id: string;
+    color: string;
+    size: string;
+    products?: RawProduct | RawProduct[] | null;
+    variant_images?: RawVariantImage[];
   };
+  type RawOrderItem = OrderItem & { product_variants?: RawVariant | null };
+
+  const rawOrder = data as any;
+  const rawItems = (rawOrder.order_items || []) as RawOrderItem[];
+
+  const items: EnrichedOrderItem[] = rawItems.map((item) => {
+    const variant = item.product_variants;
+    // Handle products relation which might be object or array
+    const product = Array.isArray(variant?.products)
+      ? variant?.products[0]
+      : variant?.products;
+
+    const productImages = product?.product_images || [];
+    const sortedProductImages = [...productImages].sort((a, b) => (a.display_order || 0) - (b.display_order || 0));
+
+    // Get image from variant images (sorted by display order), fallback to product image
+    const variantImages = variant?.variant_images || [];
+    const sortedVariantImages = [...variantImages].sort((a, b) => (a.display_order || 0) - (b.display_order || 0));
+
+    const mainImage = sortedVariantImages[0]?.image_url || sortedProductImages[0]?.image_url;
+
+    return {
+      ...item,
+      // Remove the nested object from the result to keep it clean
+      product_variants: undefined,
+      image_url: mainImage,
+      color: variant?.color,
+      size: variant?.size,
+      product_id: product?.id,
+      // We don't have slug in product table yet per types.ts, so we might skip it or use id
+      // product_slug: product?.slug 
+    };
+  });
 
   return {
-    ...order,
-    items: order.order_items || [],
-    status_history: order.order_status_history || [],
-    payment: order.payments && order.payments.length > 0 ? order.payments[0] : null,
+    ...rawOrder,
+    items: items,
+    status_history: rawOrder.order_status_history || [],
+    payment: rawOrder.payments && rawOrder.payments.length > 0 ? rawOrder.payments[0] : null,
+    shipping_address: rawOrder.addresses || (() => { console.warn('Addresses missing in order response', id); return null; })(),
   };
 }
 
@@ -43,7 +108,8 @@ export async function createOrder(
   userId: string,
   orderData: CreateOrderRequest,
   shippingAmount: number = 0,
-  idempotencyKey?: string
+  idempotencyKey?: string,
+  paymentMode: 'PREPAID' | 'COD' | 'PARTIAL_COD' = 'PREPAID'
 ): Promise<OrderResponse> {
   const db = getAdminDbClient();
 
@@ -57,15 +123,21 @@ export async function createOrder(
 
   if (rpcError) {
     const errorMessage = rpcError.message || 'Unknown error';
-    
+    console.error('[ORDER REPO] RPC Error creating order:', errorMessage, rpcError);
+
     if (errorMessage.includes('Insufficient stock')) {
       throw new ConflictError(errorMessage);
     }
     if (errorMessage.includes('not found')) {
       throw new NotFoundError(errorMessage);
     }
-    
+
     throw new Error(`Failed to create order: ${errorMessage}`);
+  }
+
+  if (!result) {
+    console.error('[ORDER REPO] No result returned from create_order_transactional');
+    throw new Error('Failed to create order: No result returned');
   }
 
   const orderResult = result as {
@@ -83,9 +155,113 @@ export async function createOrder(
     return existingOrder;
   }
 
-  const createdOrder = await findOrderById(orderResult.order_id);
+  let createdOrder = await findOrderById(orderResult.order_id);
   if (!createdOrder) {
     throw new Error('Failed to retrieve created order');
+  }
+
+  // Handle Promo Code
+  if (orderData.promo_code || orderData.coupon_code) {
+    const code = orderData.promo_code || orderData.coupon_code!;
+    console.log('[ORDER REPO] Applying promo code:', code, 'to order:', createdOrder.id);
+
+    try {
+      // Import dynamically to avoid circular dependencies if any, or just standard import
+      const { PromoService } = await import('@/services/promo');
+
+      const { success, discountAmount } = await PromoService.applyPromoCode(
+        code,
+        createdOrder.id,
+        userId,
+        createdOrder.subtotal
+      );
+
+      if (success && discountAmount > 0) {
+        console.log('[ORDER REPO] Promo code applied successfully. Discount:', discountAmount);
+
+        // Recalculate totals
+        // Tax rate should match the database function (10%)
+        const taxableAmount = Math.max(0, createdOrder.subtotal - discountAmount);
+        const newTax = taxableAmount * 0.1; // 10% tax to match database function
+        const newTotal = taxableAmount + createdOrder.shipping + newTax;
+
+        // Update Order
+        const { error: updateError } = await db
+          .from('orders')
+          .update({
+            discount: discountAmount,
+            tax: newTax,
+            total: newTotal
+          } as any) // Cast as any because generated types might not have discount yet
+          .eq('id', createdOrder.id);
+
+        if (updateError) {
+          console.error('[ORDER REPO] Error updating order with discount:', updateError);
+          throw new Error(`Failed to update order with discount: ${updateError.message}`);
+        }
+
+        // Fetch updated order
+        const updated = await findOrderById(createdOrder.id);
+        if (updated) {
+          createdOrder = updated;
+          console.log('[ORDER REPO] Order updated with promo code successfully');
+        }
+      } else {
+        console.log('[ORDER REPO] Promo code application returned success=false or zero discount');
+      }
+    } catch (error) {
+      console.error('[ORDER REPO] Failed to apply promo code during order creation:', error);
+      console.error('[ORDER REPO] Error details:', error instanceof Error ? error.message : String(error));
+
+      // Rollback: Delete the order since promo code application failed
+      // The user expects the discount, so we should fail the entire order creation
+      try {
+        console.log('[ORDER REPO] Rolling back order creation due to promo code failure');
+        const { error: deleteError } = await db.from('orders').delete().eq('id', createdOrder.id);
+        if (deleteError) {
+          console.error('[ORDER REPO] Failed to rollback order:', deleteError);
+        }
+      } catch (rollbackError) {
+        console.error('[ORDER REPO] Exception during rollback:', rollbackError);
+      }
+
+      // Re-throw the original error with more context
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error applying promo code';
+      throw new Error(`Failed to apply promo code "${code}": ${errorMessage}`);
+    }
+  }
+
+  // Handle Partial COD
+  if (paymentMode === 'PARTIAL_COD') {
+    const advanceAmount = 70; // Fixed advance amount
+    const totalAmount = createdOrder.total;
+    const remainingBalance = Math.max(0, totalAmount - advanceAmount);
+
+    console.log('[ORDER REPO] Setting up Partial COD for order:', createdOrder.id);
+
+    const { error: updateError } = await db
+      .from('orders')
+      .update({
+        payment_mode: 'PARTIAL_COD',
+        advance_payment_amount: advanceAmount,
+        remaining_balance: remainingBalance,
+        is_partial_payment: true
+      } as any)
+      .eq('id', createdOrder.id);
+
+    if (updateError) {
+      console.error('[ORDER REPO] Error updating order with partial COD details:', updateError);
+    } else {
+      // Fetch updated order with new fields
+      const updated = await findOrderById(createdOrder.id);
+      if (updated) {
+        createdOrder = updated;
+      }
+    }
+  } else if (paymentMode === 'COD') {
+    // Just mark as COD
+    await db.from('orders').update({ payment_mode: 'COD' } as any).eq('id', createdOrder.id);
+    createdOrder.payment_mode = 'COD';
   }
 
   return createdOrder;
@@ -340,13 +516,13 @@ export async function findOrderByIdAdmin(id: string): Promise<unknown | null> {
     },
     shippingAddress: address.id
       ? {
-          name: String(address.name ?? ''),
-          street: String(address.street ?? ''),
-          city: String(address.city ?? ''),
-          state: String(address.state ?? ''),
-          zip: String(address.zip ?? ''),
-          country: String(address.country ?? ''),
-        }
+        name: String(address.name ?? ''),
+        street: String(address.street ?? ''),
+        city: String(address.city ?? ''),
+        state: String(address.state ?? ''),
+        zip: String(address.zip ?? ''),
+        country: String(address.country ?? ''),
+      }
       : null,
     status: order.status as OrderStatus,
     statusHistory: orderStatusHistory.map((h) => ({
@@ -363,11 +539,11 @@ export async function findOrderByIdAdmin(id: string): Promise<unknown | null> {
     })),
     payment: payment
       ? {
-          method: String(payment.method ?? ''),
-          status: String(payment.status ?? ''),
-          amount: Number(payment.amount ?? 0),
-          transactionId: String(payment.id ?? ''),
-        }
+        method: String(payment.method ?? ''),
+        status: String(payment.status ?? ''),
+        amount: Number(payment.amount ?? 0),
+        transactionId: String(payment.id ?? ''),
+      }
       : null,
     shipping: {
       method: 'standard',
@@ -375,8 +551,13 @@ export async function findOrderByIdAdmin(id: string): Promise<unknown | null> {
       trackingNumber: null,
     },
     subtotal: Number(order.subtotal ?? 0),
+    discount: Number(order.discount ?? 0),
     tax: Number(order.tax ?? 0),
     total: Number(order.total ?? 0),
+    paymentMode: String(order.payment_mode || 'PREPAID'),
+    advancePayment: Number(order.advance_payment_amount ?? 0),
+    remainingBalance: Number(order.remaining_balance ?? 0),
+    isPartialPayment: Boolean(order.is_partial_payment ?? false),
     createdAt: String(order.created_at ?? ''),
     updatedAt: String(order.updated_at ?? ''),
   };

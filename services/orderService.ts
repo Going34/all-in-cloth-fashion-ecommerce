@@ -8,7 +8,18 @@ export async function getOrders(userId: string): Promise<OrderWithItems[]> {
     .from('orders')
     .select(`
       *,
-      order_items (*),
+      order_items (
+        *,
+        product_variants (
+          id,
+          products (
+            id,
+            name,
+            product_images (image_url, display_order)
+          ),
+          variant_images (image_url, display_order)
+        )
+      ),
       order_status_history (*)
     `)
     .eq('user_id', userId)
@@ -19,11 +30,32 @@ export async function getOrders(userId: string): Promise<OrderWithItems[]> {
     return [];
   }
 
-  return ((data as any[]) || []).map((order) => ({
-    ...order,
-    items: order.order_items || [],
-    status_history: order.order_status_history || [],
-  }));
+  return ((data as any[]) || []).map((order) => {
+    const items = (order.order_items || []).map((item: any) => {
+      const variant = item.product_variants;
+      const product = Array.isArray(variant?.products) ? variant?.products[0] : variant?.products;
+
+      const pImages = product?.product_images || [];
+      const vImages = variant?.variant_images || [];
+      // Sort effectively by display_order
+      pImages.sort((a: any, b: any) => (a.display_order || 0) - (b.display_order || 0));
+      vImages.sort((a: any, b: any) => (a.display_order || 0) - (b.display_order || 0));
+
+      const mainImage = vImages[0]?.image_url || pImages[0]?.image_url;
+
+      return {
+        ...item,
+        image_url: mainImage,
+        // Clean up nested data if desired, typically UI uses what's on item
+      };
+    });
+
+    return {
+      ...order,
+      items: items,
+      status_history: order.order_status_history || [],
+    };
+  });
 }
 
 export async function getOrderById(orderId: string): Promise<OrderWithItems | null> {
@@ -31,7 +63,18 @@ export async function getOrderById(orderId: string): Promise<OrderWithItems | nu
     .from('orders')
     .select(`
       *,
-      order_items (*),
+      order_items (
+        *,
+        product_variants (
+          id,
+          products (
+            id,
+            name,
+            product_images (image_url, display_order)
+          ),
+          variant_images (image_url, display_order)
+        )
+      ),
       order_status_history (*)
     `)
     .eq('id', orderId)
@@ -43,9 +86,27 @@ export async function getOrderById(orderId: string): Promise<OrderWithItems | nu
   }
 
   const order = data as any;
+  const items = (order.order_items || []).map((item: any) => {
+    const variant = item.product_variants;
+    const product = Array.isArray(variant?.products) ? variant?.products[0] : variant?.products;
+
+    const pImages = product?.product_images || [];
+    const vImages = variant?.variant_images || [];
+    // Sort effectively by display_order
+    pImages.sort((a: any, b: any) => (a.display_order || 0) - (b.display_order || 0));
+    vImages.sort((a: any, b: any) => (a.display_order || 0) - (b.display_order || 0));
+
+    const mainImage = vImages[0]?.image_url || pImages[0]?.image_url;
+
+    return {
+      ...item,
+      image_url: mainImage,
+    };
+  });
+
   return {
     ...order,
-    items: order.order_items || [],
+    items: items,
     status_history: order.order_status_history || [],
   };
 }

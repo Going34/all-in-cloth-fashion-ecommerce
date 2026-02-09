@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import Image from 'next/image';
 import Navbar from '../components/Navbar';
 import CartDrawer from '../components/CartDrawer';
 import AIStylist from '../components/AIStylist';
@@ -25,7 +26,15 @@ export default function StorefrontLayout({ children }: { children: React.ReactNo
       <footer className="bg-neutral-900 text-white py-16 px-4">
         <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-4 gap-12 border-b border-white/10 pb-16">
           <div className="space-y-6">
-            <Link href="/" className="text-2xl font-serif tracking-tighter">ALL IN CLOTH</Link>
+            <Link href="/" className="inline-block  transition-opacity">
+              <Image
+                src="/logo.png"
+                alt="All in Cloth"
+                width={120}
+                height={80}
+                className="h-15 w-auto object-contain mix-blend-difference invert"
+              />
+            </Link>
             <p className="text-neutral-400 text-sm leading-relaxed">
               Redefining modern luxury through architectural silhouettes and ethical craftsmanship.
             </p>

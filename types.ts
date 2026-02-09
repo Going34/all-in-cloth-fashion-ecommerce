@@ -144,7 +144,12 @@ export interface Order {
   subtotal: number;
   tax: number;
   shipping: number;
+  discount?: number;
   total: number;
+  payment_mode?: 'PREPAID' | 'COD' | 'PARTIAL_COD';
+  advance_payment_amount?: number;
+  remaining_balance?: number;
+  is_partial_payment?: boolean;
   created_at?: string;
 }
 
@@ -163,6 +168,10 @@ export interface OrderItem {
   sku_snapshot: string;
   price_snapshot: number;
   quantity: number;
+  // UI Display fields
+  image_url?: string;
+  color?: string;
+  size?: string;
 }
 
 export interface Payment {
@@ -211,7 +220,23 @@ export interface Coupon {
   code: string;
   type: CouponType;
   value: number;
-  expires_at?: string | null;
+  min_order_amount: number;
+  max_discount?: number | null;
+  usage_limit?: number | null;
+  used_count: number;
+  valid_from?: string | null;
+  valid_till?: string | null;
+  is_active: boolean;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface PromoUsageLog {
+  id: string;
+  order_id: string;
+  user_id: string;
+  promo_code: string;
+  discount_amount: number;
   created_at?: string;
 }
 
@@ -332,6 +357,11 @@ export interface Database {
         Row: Coupon;
         Insert: Partial<Coupon> & { code: string; type: CouponType; value: number };
         Update: Partial<Coupon>;
+      };
+      promo_usage_logs: {
+        Row: PromoUsageLog;
+        Insert: Partial<PromoUsageLog> & { order_id: string; user_id: string; promo_code: string; discount_amount: number };
+        Update: Partial<PromoUsageLog>;
       };
       order_coupons: {
         Row: OrderCoupon;

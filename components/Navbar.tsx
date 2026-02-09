@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { ShoppingBag, Search, User, Menu, X, Sparkles, LogIn } from 'lucide-react';
+import Image from 'next/image';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
 
@@ -31,7 +32,7 @@ const Navbar: React.FC<NavbarProps> = ({ onOpenCart }) => {
         <div className="flex justify-between items-center h-16 sm:h-20">
           {/* Mobile Menu Button */}
           <div className="flex items-center md:hidden">
-            <button 
+            <button
               onClick={() => setIsMenuOpen(!isMenuOpen)}
               className="text-neutral-600 p-2"
             >
@@ -41,8 +42,15 @@ const Navbar: React.FC<NavbarProps> = ({ onOpenCart }) => {
 
           {/* Logo */}
           <div className="flex-shrink-0 flex items-center">
-            <Link href="/" className="text-2xl sm:text-3xl font-serif tracking-tighter hover:text-neutral-700 transition-colors">
-              ALL IN CLOTH
+            <Link href="/" className="hover:opacity-80 transition-opacity">
+              <Image
+                src="/logo.png"
+                alt="All in Cloth"
+                width={120}
+                height={40}
+                className="h-8 sm:h-10 w-auto object-contain"
+                priority
+              />
             </Link>
           </div>
 
@@ -52,9 +60,8 @@ const Navbar: React.FC<NavbarProps> = ({ onOpenCart }) => {
               <Link
                 key={link.path}
                 href={link.path}
-                className={`text-sm font-medium transition-colors hover:text-neutral-900 ${
-                  isActive(link.path) ? 'text-neutral-900' : 'text-neutral-500'
-                }`}
+                className={`text-sm font-medium transition-colors hover:text-neutral-900 ${isActive(link.path) ? 'text-neutral-900' : 'text-neutral-500'
+                  }`}
               >
                 {link.name}
               </Link>
@@ -66,7 +73,7 @@ const Navbar: React.FC<NavbarProps> = ({ onOpenCart }) => {
             {/* <button className="p-2 text-neutral-500 hover:text-neutral-900 transition-colors">
               <Search size={20} />
             </button> */}
-            
+
             {isAuthenticated ? (
               <Link href="/account" className="flex items-center space-x-2 p-2 text-neutral-500 hover:text-neutral-900 transition-colors group">
                 <div className="w-8 h-8 rounded-full bg-neutral-100 flex items-center justify-center group-hover:bg-neutral-200 transition-colors overflow-hidden">
@@ -80,7 +87,7 @@ const Navbar: React.FC<NavbarProps> = ({ onOpenCart }) => {
               </Link>
             )}
 
-            <button 
+            <button
               onClick={onOpenCart}
               className="p-2 text-neutral-500 hover:text-neutral-900 transition-colors relative"
             >
