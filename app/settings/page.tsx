@@ -31,14 +31,15 @@ function SettingsContent() {
     }
   }, [dispatch, userDataLoaded]);
 
-  useEffect(() => {
+  const handleEditClick = () => {
     if (profile) {
       setProfileFormData({
         name: profile.name || '',
         phone: profile.phone || '',
       });
     }
-  }, [profile]);
+    setIsEditingProfile(true);
+  };
 
   const handleUpdateProfile = (e: React.FormEvent) => {
     e.preventDefault();
@@ -66,7 +67,7 @@ function SettingsContent() {
           </div>
           <div className="divide-y divide-neutral-100">
             <button 
-              onClick={() => setIsEditingProfile(true)}
+              onClick={handleEditClick}
               className="w-full p-4 flex justify-between items-center hover:bg-neutral-50 transition-colors"
             >
               <span className="text-sm font-medium">Edit Public Profile</span>

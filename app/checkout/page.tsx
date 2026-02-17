@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useCart } from '../../context/CartContext';
+import { useAuth } from '../../context/AuthContext';
 import { PromoCodeInput } from '../../components/cart/PromoCodeInput';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import { selectOrdersLoading, selectOrdersError, selectSelectedOrder } from '../../store/slices/orders/ordersSelectors';
@@ -24,6 +25,7 @@ declare global {
 }
 
 function CheckoutContent() {
+  const { user } = useAuth();
   const { cart, totalPrice, clearCart, subtotal, discountAmount, finalTotal, promoCode } = useCart();
   const router = useRouter();
   const dispatch = useAppDispatch();
@@ -60,11 +62,11 @@ function CheckoutContent() {
   const [paymentMode, setPaymentMode] = useState<'PREPAID' | 'PARTIAL_COD'>('PREPAID');
   const advanceAmount = 70;
 
-  const shipping = 15;
+  const shipping = 0;
   // Calculate tax on the discounted total
-  // IMPORTANT: Tax rate must match backend (10% in order.repository.ts)
+  // Tax included in price
   const taxableAmount = Math.max(0, subtotal - discountAmount);
-  const tax = taxableAmount * 0.1; // 10% tax rate (matches backend)
+  const tax = 0; 
   const grandTotal = taxableAmount + shipping + tax;
 
   const paymentAmount = paymentMode === 'PARTIAL_COD' ? advanceAmount : grandTotal;
@@ -289,6 +291,15 @@ function CheckoutContent() {
       const paymentData = await paymentResponse.json();
       const paymentConfig = paymentData.data;
 
+      const addressDetails = useNewAddress 
+        ? newAddressForm 
+        : addresses.find(a => a.id === selectedAddressId);
+      
+      const prefillPhone = addressDetails?.phone || user?.phone || '';
+      // Ensure phone number has country code for Razorpay if possible, 
+      // but usually just digits works if user is in India. 
+      // Sometimes Razorpay prefers +91. Let's assume input is clean or just pass as is.
+      
       const options = {
         key: paymentConfig.key_id,
         amount: paymentConfig.amount,
@@ -349,9 +360,9 @@ function CheckoutContent() {
           }
         },
         prefill: {
-          name: '',
-          email: '',
-          contact: '',
+          name: addressDetails?.name || user?.name || '',
+          email: user?.email || '',
+          contact: prefillPhone,
         },
         theme: {
           color: '#000000',
@@ -677,7 +688,7 @@ function CheckoutContent() {
                     <p className="text-xs text-neutral-500">3-5 Business Days</p>
                   </div>
                 </div>
-                <span className="font-semibold">{formatCurrency(15)}</span>
+                <span className="font-semibold text-green-600">Free</span>
               </label>
             </div>
           </div>
@@ -804,11 +815,11 @@ function CheckoutContent() {
 
               <div className="flex justify-between text-neutral-600">
                 <span>Shipping</span>
-                <span>{formatCurrency(shipping)}</span>
+                <span className="text-green-600 font-medium">Free</span>
               </div>
               <div className="flex justify-between text-neutral-600">
                 <span>Estimated Tax</span>
-                <span>{formatCurrency(tax)}</span>
+                <span className="text-neutral-500">Included</span>
               </div>
               <div className="flex justify-between text-xl font-bold pt-4 border-t border-neutral-200 mt-4">
                 <span>Total</span>

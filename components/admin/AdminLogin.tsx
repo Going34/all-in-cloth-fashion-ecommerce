@@ -45,7 +45,7 @@ const AdminLogin: React.FC = () => {
       const data = await response.json();
 
       if (!response.ok) {
-        setError(data.error || 'Login failed. Please check your credentials.');
+        setError(data.error?.message || 'Login failed. Please check your credentials.');
         setIsLoading(false);
         return;
       }

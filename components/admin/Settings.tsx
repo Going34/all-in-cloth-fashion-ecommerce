@@ -57,6 +57,7 @@ const AdminSettings: React.FC = () => {
           ? (settings.paymentMethods as Record<string, unknown>)
           : undefined;
 
+      // eslint-disable-next-line react-hooks/exhaustive-deps
       setLocalSettings((prev) => ({
         ...prev,
         ...settings,
@@ -79,6 +80,8 @@ const AdminSettings: React.FC = () => {
       setTempShippingRate(settings.shipping.standardRate.toString());
       setTempTaxRate(settings.tax.rate.toString());
     }
+    // We want to sync whenever settings change from the server
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [settings]);
 
   const handleSave = () => {

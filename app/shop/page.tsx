@@ -23,8 +23,7 @@ function ShopContent() {
   const productsCache = useAppSelector(selectProductsCache);
   const categories = useAppSelector(selectCategories);
   
-  const categoryParam = searchParams.get('category');
-  const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(categoryParam || null);
+  const selectedCategoryId = searchParams.get('category');
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState('Newest');
 
@@ -32,17 +31,9 @@ function ShopContent() {
     dispatch(categoriesActions.fetchCategoriesDataRequest());
   }, [dispatch]);
 
-  // Update selected category from URL params
-  useEffect(() => {
-    const cat = searchParams.get('category');
-    if (cat !== selectedCategoryId) {
-      setSelectedCategoryId(cat || null);
-    }
-  }, [searchParams, selectedCategoryId]);
-
   // Handle product fetching
   useEffect(() => {
-    const cat = searchParams.get('category');
+    const cat = selectedCategoryId;
     
     // Only fetch if products haven't been loaded yet
     if (!productsLoaded || Object.keys(productsCache).length === 0) {
@@ -60,7 +51,7 @@ function ShopContent() {
       // Dispatch with filters to trigger filtering in saga (which will use cache)
       dispatch(productsActions.fetchUserProductsRequest(filters));
     }
-  }, [dispatch, searchParams, productsLoaded, productsCache, selectedCategoryId]);
+  }, [dispatch, productsLoaded, productsCache, selectedCategoryId]);
 
   const getProductPrice = (product: Product): number => {
     if (product.variants && product.variants.length > 0) {
@@ -118,7 +109,6 @@ function ShopContent() {
   }, [products, selectedCategoryId, searchQuery, sortBy, searchParams]);
 
   const handleCategoryChange = (categoryId: string | null) => {
-    setSelectedCategoryId(categoryId);
     const params = new URLSearchParams(searchParams.toString());
     if (!categoryId) {
       params.delete('category');

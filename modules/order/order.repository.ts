@@ -180,9 +180,9 @@ export async function createOrder(
         console.log('[ORDER REPO] Promo code applied successfully. Discount:', discountAmount);
 
         // Recalculate totals
-        // Tax rate should match the database function (10%)
+        // Tax rate should match the database function (0%)
         const taxableAmount = Math.max(0, createdOrder.subtotal - discountAmount);
-        const newTax = taxableAmount * 0.1; // 10% tax to match database function
+        const newTax = 0; // Tax included in price
         const newTotal = taxableAmount + createdOrder.shipping + newTax;
 
         // Update Order

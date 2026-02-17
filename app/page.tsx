@@ -2,6 +2,7 @@
 
 import React, { useEffect } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { ArrowRight, Star } from 'lucide-react';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { productsActions } from '../store/slices/products/productsSlice';
@@ -33,10 +34,12 @@ export default function Home() {
     <div className="space-y-24 pb-20">
       {/* Hero Section */}
       <section className="relative h-[85vh] overflow-hidden">
-        <img 
+        <Image 
           src="https://images.unsplash.com/photo-1490481651871-ab68de25d43d?q=80&w=2000" 
           alt="Hero Fashion" 
+          fill
           className="absolute inset-0 w-full h-full object-cover"
+          priority
         />
         <div className="absolute inset-0 bg-black/30" />
         <div className="absolute inset-0 flex items-center justify-center text-center px-4">
@@ -95,12 +98,13 @@ export default function Home() {
               className="group"
             >
               <div className="relative aspect-[3/4] bg-neutral-100 overflow-hidden mb-4">
-                <img 
-                  src={product.image} 
+                <Image 
+                  src={product.image || '/placeholder.png'} 
                   alt={product.name}
+                  fill
                   className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
                 />
-                <button className="absolute bottom-4 left-4 right-4 bg-white/90 backdrop-blur py-3 text-sm font-medium opacity-0 translate-y-2 transition-all group-hover:opacity-100 group-hover:translate-y-0">
+                <button className="absolute bottom-4 left-4 right-4 bg-white/90 backdrop-blur py-3 text-sm font-medium opacity-0 translate-y-2 transition-all group-hover:opacity-100 group-hover:translate-y-0 z-10">
                   Quick View
                 </button>
               </div>
@@ -147,12 +151,13 @@ export default function Home() {
             </Link>
           </div>
           <div className="relative aspect-[4/5]">
-            <img 
+            <Image 
               src="https://images.unsplash.com/photo-1539109136881-3be0616acf4b?q=80&w=800" 
               alt="Model with jacket" 
+              fill
               className="w-full h-full object-cover shadow-2xl"
             />
-            <div className="absolute -bottom-8 -left-8 bg-white p-8 hidden lg:block shadow-xl max-w-xs">
+            <div className="absolute -bottom-8 -left-8 bg-white p-8 hidden lg:block shadow-xl max-w-xs z-10">
               <p className="text-sm italic font-serif">&ldquo;All in cloth redefined my approach to layering. The materials are simply unmatched.&rdquo;</p>
               <p className="text-xs font-bold mt-4 uppercase tracking-tighter">— Elena Vance, Art Director</p>
             </div>
